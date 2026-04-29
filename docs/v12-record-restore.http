@@ -1,0 +1,29 @@
+### 查询记录审计
+GET http://localhost:8080/api/v1/records/audits?type=WEIGHT&recordId={{weightRecordId}}&limit=20
+Authorization: Bearer {{token}}
+
+### 基于删除审计恢复记录
+POST http://localhost:8080/api/v1/records/restore?type=WEIGHT&recordId={{weightRecordId}}&auditId={{deleteAuditId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "changeReason": "undo delete"
+}
+
+### 查询恢复后的详情
+GET http://localhost:8080/api/v1/records/detail?type=WEIGHT&recordId={{weightRecordId}}
+Authorization: Bearer {{token}}
+
+### 基于更新审计回滚记录
+POST http://localhost:8080/api/v1/records/restore?type=WEIGHT&recordId={{weightRecordId}}&auditId={{updateAuditId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "changeReason": "undo update"
+}
+
+### 查询回滚后的详情
+GET http://localhost:8080/api/v1/records/detail?type=WEIGHT&recordId={{weightRecordId}}
+Authorization: Bearer {{token}}

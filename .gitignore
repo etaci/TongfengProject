@@ -1,0 +1,9 @@
+storage/
+backend-java/data/
+backend-java/.mvn/wrapper/maven-wrapper.jar
+backend-java-maven-temp/
+backend-java-maven-temp.zip
+backend-java.zip
+gradle-8.14.4-bin.zip
+backend-ai/__pycache__/
+backend-ai/.venv/

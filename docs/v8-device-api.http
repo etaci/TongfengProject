@@ -1,0 +1,113 @@
+@host = http://localhost:8080
+@token = 请先填入 mock-login 返回的 token
+@deviceCode = 请填入设备编码
+
+### 1. 查看设备目录
+GET {{host}}/api/v1/devices/catalog
+Authorization: Bearer {{token}}
+
+### 2. 绑定多指标健康站
+POST {{host}}/api/v1/devices
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "deviceType": "HEALTH_COMBO_STATION",
+  "vendorName": "Tongfeng",
+  "deviceModel": "STATION-1",
+  "serialNumber": "STATION-SN-001",
+  "aliasName": "family-health-station"
+}
+
+### 3. 查看设备列表
+GET {{host}}/api/v1/devices
+Authorization: Bearer {{token}}
+
+### 4. 查看设备总览
+GET {{host}}/api/v1/devices/overview
+Authorization: Bearer {{token}}
+
+### 5. 同步组合设备数据
+POST {{host}}/api/v1/devices/{{deviceCode}}/sync
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "metricType": "URIC_ACID",
+      "externalEventId": "evt-ua-1",
+      "measuredAt": "2026-04-29T08:00:00Z",
+      "value": 502,
+      "unit": "umol/L",
+      "note": "device sync"
+    },
+    {
+      "metricType": "HYDRATION",
+      "externalEventId": "evt-hyd-1",
+      "measuredAt": "2026-04-29T09:00:00Z",
+      "waterIntakeMl": 900,
+      "urineColorLevel": 4,
+      "note": "smart cup sync"
+    },
+    {
+      "metricType": "WEIGHT",
+      "externalEventId": "evt-weight-1",
+      "measuredAt": "2026-04-29T10:00:00Z",
+      "value": 71.8,
+      "unit": "kg",
+      "note": "smart scale sync"
+    },
+    {
+      "metricType": "BLOOD_PRESSURE",
+      "externalEventId": "evt-bp-1",
+      "measuredAt": "2026-04-29T10:05:00Z",
+      "systolicPressure": 162,
+      "diastolicPressure": 101,
+      "pulseRate": 88,
+      "unit": "mmHg",
+      "note": "bp monitor sync"
+    }
+  ]
+}
+
+### 6. 查看同步历史
+GET {{host}}/api/v1/devices/{{deviceCode}}/sync-events
+Authorization: Bearer {{token}}
+
+### 7. 查看同步后的设备总览
+GET {{host}}/api/v1/devices/overview
+Authorization: Bearer {{token}}
+
+### 8. 绑定尿酸仪用于白名单校验
+POST {{host}}/api/v1/devices
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "deviceType": "URIC_ACID_METER",
+  "vendorName": "Tongfeng",
+  "deviceModel": "UA-1",
+  "serialNumber": "UA-SN-GUARD-001",
+  "aliasName": "ua-meter"
+}
+
+### 9. 非法同步示例：向尿酸仪写入血压
+POST {{host}}/api/v1/devices/{{deviceCode}}/sync
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "metricType": "BLOOD_PRESSURE",
+      "externalEventId": "evt-bp-blocked-1",
+      "measuredAt": "2026-04-29T10:05:00Z",
+      "systolicPressure": 142,
+      "diastolicPressure": 91,
+      "pulseRate": 80,
+      "unit": "mmHg",
+      "note": "should be blocked"
+    }
+  ]
+}

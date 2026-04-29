@@ -1,0 +1,36 @@
+@host = http://localhost:8080
+@token = 请先填入 Bearer token
+@recordId = 请填入记录ID
+@cursor = 请填入上一页返回的 nextCursor
+
+### 1. 查询记录中心第一页
+GET {{host}}/api/v1/records/center?types=WEIGHT&types=BLOOD_PRESSURE&types=URIC_ACID&limit=3
+Authorization: Bearer {{token}}
+
+### 2. 使用游标拉取下一页
+GET {{host}}/api/v1/records/center?types=WEIGHT&types=BLOOD_PRESSURE&types=URIC_ACID&limit=3&cursor={{cursor}}
+Authorization: Bearer {{token}}
+
+### 3. 查看体重记录详情
+GET {{host}}/api/v1/records/detail?type=WEIGHT&recordId={{recordId}}
+Authorization: Bearer {{token}}
+
+### 4. 查看血压记录详情
+GET {{host}}/api/v1/records/detail?type=BLOOD_PRESSURE&recordId={{recordId}}
+Authorization: Bearer {{token}}
+
+### 5. 删除一条体重记录
+DELETE {{host}}/api/v1/records/detail?type=WEIGHT&recordId={{recordId}}
+Authorization: Bearer {{token}}
+
+### 6. 删除后再次查看详情
+GET {{host}}/api/v1/records/detail?type=WEIGHT&recordId={{recordId}}
+Authorization: Bearer {{token}}
+
+### 7. 非法类型示例
+GET {{host}}/api/v1/records/detail?type=MEAL&recordId={{recordId}}
+Authorization: Bearer {{token}}
+
+### 8. 非法游标示例
+GET {{host}}/api/v1/records/center?types=WEIGHT&limit=3&cursor=not-a-valid-instant
+Authorization: Bearer {{token}}

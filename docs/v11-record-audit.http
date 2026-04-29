@@ -1,0 +1,39 @@
+### mock login
+POST http://localhost:8080/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "v11-demo"
+}
+
+> {%
+  client.global.set("token", response.body.data.token);
+%}
+
+### list weight records
+GET http://localhost:8080/api/v1/records/weight
+Authorization: Bearer {{token}}
+
+### update weight record
+PUT http://localhost:8080/api/v1/records/detail?type=WEIGHT&recordId={{weightRecordId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "decimalValue": 70.6,
+  "source": "manual-adjustment",
+  "note": "after calibration",
+  "changeReason": "sync source normalized"
+}
+
+### list record audits
+GET http://localhost:8080/api/v1/records/audits?type=WEIGHT&recordId={{weightRecordId}}&limit=20
+Authorization: Bearer {{token}}
+
+### delete record
+DELETE http://localhost:8080/api/v1/records/detail?type=WEIGHT&recordId={{weightRecordId}}
+Authorization: Bearer {{token}}
+
+### list record audits after delete
+GET http://localhost:8080/api/v1/records/audits?type=WEIGHT&recordId={{weightRecordId}}&limit=20
+Authorization: Bearer {{token}}

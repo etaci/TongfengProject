@@ -1,0 +1,38 @@
+@host = http://localhost:8080
+@token = 请先填入 Bearer token
+
+### 1. 查询尿酸记录
+GET {{host}}/api/v1/records/uric-acid
+Authorization: Bearer {{token}}
+
+### 2. 查询体重记录
+GET {{host}}/api/v1/records/weight
+Authorization: Bearer {{token}}
+
+### 3. 查询血压记录
+GET {{host}}/api/v1/records/blood-pressure
+Authorization: Bearer {{token}}
+
+### 4. 查询补水记录
+GET {{host}}/api/v1/records/hydration
+Authorization: Bearer {{token}}
+
+### 5. 查询发作记录
+GET {{host}}/api/v1/records/flares
+Authorization: Bearer {{token}}
+
+### 6. 查询统一记录中心
+GET {{host}}/api/v1/records/center
+Authorization: Bearer {{token}}
+
+### 7. 按类型筛选统一记录中心
+GET {{host}}/api/v1/records/center?types=WEIGHT&types=BLOOD_PRESSURE&types=URIC_ACID&limit=5
+Authorization: Bearer {{token}}
+
+### 8. 只看补水与发作
+GET {{host}}/api/v1/records/center?types=HYDRATION&types=FLARE&limit=10
+Authorization: Bearer {{token}}
+
+### 9. 非法类型示例
+GET {{host}}/api/v1/records/center?types=MEAL&limit=10
+Authorization: Bearer {{token}}
