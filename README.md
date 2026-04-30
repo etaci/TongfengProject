@@ -5,10 +5,12 @@
 1. 首版核心闭环
 2. 第二版核心闭环
 
-这一轮的重点是把两条增强线一起落完：
+这一轮的重点是把两条增强线一起落完，并按最新 MVP 范围收缩非核心能力：
 
 - Java 主服务从“内存态”升级为“可持久化 + 可调度”的主动管理后端
 - Python AI 服务从“纯 mock”升级为“真实 OCR + 本地知识库检索”的可运行服务
+
+当前代码基线已经移除设备接入、成长体系与血压闭环，集中保障登录、档案、饮食识别、核心健康记录、主动管理、家属协同与 AI 辅助链路稳定可交付。
 
 当前默认可用 H2 本地运行，也支持切换到 MySQL；Redis 作为可选会话缓存预留。
 
@@ -30,6 +32,7 @@
 ### 首版核心闭环
 
 - 模拟登录与 Bearer Token 鉴权
+- 应用能力查询
 - 用户档案管理
 - 文件上传与访问
 - 餐盘识别闭环
@@ -37,6 +40,7 @@
 - 体重记录
 - 发作记录
 - 饮水/尿液打卡
+- 记录中心、详情、审计与恢复
 - 首页总览
 - 趋势图数据
 - 提醒列表
@@ -80,40 +84,7 @@
   - 家属查看患者风险摘要与告警列表
   - 任一方可解除绑定结束授权
 
-### 当前继续推进的平台生态第一段
-
-- 第三方设备接入
-  - 设备绑定与解绑
-  - 设备同步事件去重
-  - 设备尿酸数据自动转正式尿酸记录
-  - 设备补水数据自动转正式饮水记录
-  - 设备同步历史可查询
-
-### 当前继续推进的平台生态第二段
-
-- V5 积分成长体系
-  - 健康行为自动奖励积分
-  - 等级成长与连续活跃天数
-  - 今日任务清单
-  - 勋章徽章解锁
-  - 积分流水与成长总览接口
-
-### 当前继续推进的平台生态第三段
-
-- V6 成长运营增强
-  - 周目标与成长挑战
-  - 风险导向任务
-  - 家属协作挑战
-  - 奖励兑换与领取历史
-  - 可兑换积分余额闭环
-
-### 当前继续推进的平台生态第四段
-
-- V7 多指标设备接入
-  - 新增血压正式记录闭环
-  - 设备同步扩展到体重与血压
-  - 血压记录进入时间线与提醒系统
-  - 血压接口已预留给前端直接联调
+当前版本不再继续推进设备接入、成长体系与血压闭环，后续资源优先投入 MVP 主链路稳定性、记录治理能力与家属协同体验。
 
 ## 当前技术形态
 
@@ -219,13 +190,11 @@ python -m compileall H:\ProjectTongfeng\backend-ai
 ## 联调顺序建议
 
 1. 先调用 `POST /api/v1/auth/mock-login` 获取 token。
-2. 再联调用户档案页。
-3. 然后接饮食拍照识别和尿酸/体重/发作/饮水记录接口。
-4. 首页接 `overview + trends + reminders + daily-summaries`。
-5. 再接化验单、问答、画像、用药等第二版能力。
-6. 下一版可继续接 `proactive-care/settings + proactive-care/brief + flares/reports/latest`。
-7. 家属协同页可继续接 `family/invitations + family/members + family/alerts + family/patients/{patientUserId}/summary`。
-8. 设备接入页可继续接 `devices + devices/{deviceCode}/sync + devices/{deviceCode}/sync-events`。
-9. 成长激励页可继续接 `growth/overview + growth/tasks + growth/points + growth/badges`。
-10. 成长运营页可继续接 `growth/weekly-plan + growth/rewards + growth/rewards/{rewardKey}/claim + growth/reward-claims`。
-11. 多指标设备页可继续接 `records/blood-pressure + devices/{deviceCode}/sync`，同步支持 `URIC_ACID / HYDRATION / WEIGHT / BLOOD_PRESSURE`。
+2. 登录后先拉一次 `GET /api/v1/app/capabilities`，确认家属协同是否开放。
+3. 再联调用户档案页。
+4. 然后接饮食拍照识别和尿酸/体重/发作/饮水记录接口。
+5. 如需记录治理能力，再接 `records/center + records/detail + records/audits + records/restore`。
+6. 首页接 `overview + trends + reminders + daily-summaries`。
+7. 再接化验单、问答、画像、用药等第二版能力。
+8. 下一版可继续接 `proactive-care/settings + proactive-care/brief + flares/reports/latest`。
+9. 家属协同页可继续接 `family/invitations + family/members + family/alerts + family/patients/{patientUserId}/summary`。

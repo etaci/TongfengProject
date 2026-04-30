@@ -6,12 +6,12 @@ import { ArraySummary, BulletList } from "../components/HealthBlocks";
 import { mealTypeOptions } from "../constants/options";
 import { formatDate, formatDateTime, mealTypeLabel } from "../utils/format";
 
-export default function AnalysisPage({ data, busyMap, session, handleMealSubmit, handleLabSubmit }) {
+export default function AnalysisPage({ data, busyMap, session, handleMealSubmit }) {
   return (
     <section className="content-section" id="analysis">
       <SectionHeader
         kicker="03 / 分析"
-        title="承接后端的饮食识别、化验单解析和画像能力，把分析结果整理成可以持续扩展的动态面板。"
+        title="聚焦饮食识别、尿酸波动原因分析和用户画像，让用户更快理解“为什么会高、接下来怎么做”。"
       />
 
       <div className="overview-grid">
@@ -43,7 +43,7 @@ export default function AnalysisPage({ data, busyMap, session, handleMealSubmit,
             </label>
             <label>
               <span>备注</span>
-              <textarea name="note" rows="3" placeholder="补充说明本次饮食背景、是否聚餐等信息" />
+              <textarea name="note" rows="3" placeholder="补充说明本次饮食背景，例如聚餐、夜宵、应酬等" />
             </label>
             <button className="primary-button" type="submit" disabled={!session || busyMap.meal}>
               {busyMap.meal ? "识别中..." : "开始识别"}
@@ -86,124 +86,63 @@ export default function AnalysisPage({ data, busyMap, session, handleMealSubmit,
                 <BulletList title="建议动作" items={data.mealResult.suggestions} />
               </>
             ) : (
-              "上传餐盘图片后，这里会展示识别结果、嘌呤估算和后续建议。"
+              "上传餐盘图片后，这里会展示识别结果、风险等级和后续建议。"
             )}
           </div>
         </Card>
       </div>
 
       <div className="overview-grid overview-grid--secondary">
-        <Card>
-          <div className="card-head">
-            <div>
-              <p className="eyebrow">Lab OCR</p>
-              <h3>化验单解析</h3>
-            </div>
-          </div>
-          <form className="stack-form" onSubmit={handleLabSubmit}>
-            <label>
-              <span>报告文件（图片或 PDF）</span>
-              <input name="file" type="file" accept="image/*,.pdf" />
-            </label>
-            <label>
-              <span>报告日期</span>
-              <input name="reportDate" type="date" />
-            </label>
-            <button className="primary-button" type="submit" disabled={!session || busyMap.lab}>
-              {busyMap.lab ? "解析中..." : "开始解析"}
-            </button>
-          </form>
-        </Card>
-
         <Card className="span-2">
           <div className="card-head">
             <div>
-              <p className="eyebrow">Latest lab report</p>
-              <h3>最近一次化验单结果</h3>
+              <p className="eyebrow">Cause analysis</p>
+              <h3>尿酸波动原因分析</h3>
             </div>
           </div>
-          <div className={`result-panel ${data.labResult ? "" : "empty-panel"}`}>
-            {data.labResult ? (
+          <div className={`result-panel ${data.uricAcidCauseAnalysis ? "" : "empty-panel"}`}>
+            {data.uricAcidCauseAnalysis ? (
               <>
                 <div className="result-header">
                   <div>
-                    <h4>{formatDate(data.labResult.reportDate)}</h4>
-                    <p>报告 ID：{data.labResult.reportId}</p>
+                    <h4>
+                      最近一次尿酸
+                      {data.uricAcidCauseAnalysis.latestUricAcidValue != null
+                        ? ` ${data.uricAcidCauseAnalysis.latestUricAcidValue} ${data.uricAcidCauseAnalysis.latestUricAcidUnit || ""}`
+                        : " 暂无结果"}
+                    </h4>
+                    <p>{data.uricAcidCauseAnalysis.summary || "暂无原因分析摘要。"}</p>
                   </div>
-                  <RiskBadge level={data.labResult.overallRiskLevel} />
+                  <RiskBadge level={data.uricAcidCauseAnalysis.overallRiskLevel} />
                 </div>
-                <p>{data.labResult.summary || "暂无解析摘要。"}</p>
+                <div className="stats-grid stats-grid--compact">
+                  <div className="stat-line">
+                    <span>回看范围</span>
+                    <strong>{data.uricAcidCauseAnalysis.lookbackDays} 天</strong>
+                  </div>
+                  <div className="stat-line">
+                    <span>目标值</span>
+                    <strong>{data.uricAcidCauseAnalysis.targetUricAcidValue || "-"} {data.uricAcidCauseAnalysis.latestUricAcidUnit || ""}</strong>
+                  </div>
+                  <div className="stat-line">
+                    <span>分析时间</span>
+                    <strong>{formatDate(data.uricAcidCauseAnalysis.generatedAt)}</strong>
+                  </div>
+                </div>
                 <div className="indicator-grid">
-                  {(data.labResult.indicators || []).map((item) => (
-                    <div className="indicator-chip" key={`${item.code}-${item.name}`}>
-                      <span>{item.name || item.code}</span>
-                      <strong>{item.value != null ? `${item.value} ${item.unit || ""}` : "暂无"}</strong>
-                      <small>{item.referenceRange || "无参考范围"} / {item.riskLevel}</small>
+                  {(data.uricAcidCauseAnalysis.factors || []).map((factor) => (
+                    <div className="indicator-chip" key={factor.code}>
+                      <span>{factor.title}</span>
+                      <strong>{factor.riskLevel}</strong>
+                      <small>{factor.detail}</small>
+                      <small>{factor.evidence}</small>
                     </div>
                   ))}
                 </div>
-                <BulletList title="建议动作" items={data.labResult.suggestions} />
+                <BulletList title="建议动作" items={data.uricAcidCauseAnalysis.nextActions} />
               </>
             ) : (
-              "上传化验单后，这里会展示解析指标、风险判断和建议。"
-            )}
-          </div>
-        </Card>
-      </div>
-
-      <div className="overview-grid overview-grid--secondary">
-        <Card>
-          <div className="card-head">
-            <div>
-              <p className="eyebrow">Meal history</p>
-              <h3>饮食记录</h3>
-            </div>
-          </div>
-          <div className="masonry-list">
-            {data.meals?.length ? (
-              data.meals.map((item) => (
-                <article className="list-card" key={item.recordId}>
-                  <div className="result-header">
-                    <strong>{mealTypeLabel(item.mealType)}</strong>
-                    <RiskBadge level={item.riskLevel} />
-                  </div>
-                  <p>{item.summary || "暂无摘要。"}</p>
-                  <div className="list-card__meta">
-                    <span>估算嘌呤：{item.purineEstimateMg != null ? `${item.purineEstimateMg} mg` : "暂无"}</span>
-                    <span>{formatDateTime(item.takenAt)}</span>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <EmptyState message="暂无饮食分析历史。" />
-            )}
-          </div>
-        </Card>
-
-        <Card>
-          <div className="card-head">
-            <div>
-              <p className="eyebrow">Lab archive</p>
-              <h3>化验单归档</h3>
-            </div>
-          </div>
-          <div className="masonry-list">
-            {data.labs?.length ? (
-              data.labs.map((item) => (
-                <article className="list-card" key={item.reportId}>
-                  <div className="result-header">
-                    <strong>{formatDate(item.reportDate)}</strong>
-                    <RiskBadge level={item.overallRiskLevel} />
-                  </div>
-                  <p>{item.summary || "暂无摘要。"}</p>
-                  <div className="list-card__meta">
-                    <span>指标数：{item.indicators?.length || 0}</span>
-                    <span>{item.reportId}</span>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <EmptyState message="暂无化验单归档记录。" />
+              "补充尿酸、饮食、饮水和发作记录后，这里会自动生成最近一次波动的规则归因结果。"
             )}
           </div>
         </Card>
@@ -223,8 +162,62 @@ export default function AnalysisPage({ data, busyMap, session, handleMealSubmit,
                 <p className="narrative-text">{data.persona.narrative || "暂无画像描述。"}</p>
               </>
             ) : (
-              "这里会在后端返回画像后展示标签、触发因素和总结性描述。"
+              "这里会展示后端生成的用户画像标签、诱因和总结描述。"
             )}
+          </div>
+        </Card>
+      </div>
+
+      <div className="overview-grid overview-grid--secondary">
+        <Card className="span-2">
+          <div className="card-head">
+            <div>
+              <p className="eyebrow">Meal history</p>
+              <h3>饮食识别历史</h3>
+            </div>
+          </div>
+          <div className="masonry-list">
+            {data.meals?.length ? (
+              data.meals.map((item) => (
+                <article className="list-card" key={item.recordId}>
+                  <div className="result-header">
+                    <strong>{mealTypeLabel(item.mealType)}</strong>
+                    <RiskBadge level={item.riskLevel} />
+                  </div>
+                  <p>{item.summary || "暂无摘要。"}</p>
+                  <div className="list-card__meta">
+                    <span>估算嘌呤：{item.purineEstimateMg != null ? `${item.purineEstimateMg} mg` : "暂无"}</span>
+                    <span>{formatDateTime(item.takenAt)}</span>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyState message="暂无饮食识别历史。" />
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <div className="card-head">
+            <div>
+              <p className="eyebrow">Analysis hint</p>
+              <h3>分析建议</h3>
+            </div>
+          </div>
+          <div className="result-panel">
+            <p className="narrative-text">
+              当前原因分析以规则驱动为主，会优先关联近 7 天的饮食、饮酒、补水、发作和化验单信号。
+              如果希望分析更稳定，优先保持连续 3 至 7 天记录，而不是只录入单个高值。
+            </p>
+            <BulletList
+              title="优先补齐的数据"
+              items={[
+                "最近一次尿酸结果",
+                "近几餐的饮食拍照和备注",
+                "最近 1 至 3 天的饮水记录",
+                "近期发作或化验单结果",
+              ]}
+            />
           </div>
         </Card>
       </div>

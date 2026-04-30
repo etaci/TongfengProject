@@ -27,9 +27,21 @@ import org.springframework.web.multipart.MultipartFile;
 public class CoreController {
 
 	private final HealthAssistantService healthAssistantService;
+	private final FeatureAccessService featureAccessService;
 
-	public CoreController(HealthAssistantService healthAssistantService) {
+	public CoreController(
+			HealthAssistantService healthAssistantService,
+			FeatureAccessService featureAccessService
+	) {
 		this.healthAssistantService = healthAssistantService;
+		this.featureAccessService = featureAccessService;
+	}
+
+	@GetMapping("/api/v1/app/capabilities")
+	public ApiResponse<AppContracts.AppCapabilitiesResponse> getAppCapabilities(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
+	) {
+		return ApiResponse.success(featureAccessService.getCapabilities());
 	}
 
 	@GetMapping("/api/v1/profile")
@@ -100,14 +112,6 @@ public class CoreController {
 			@Valid @RequestBody AppContracts.WeightCreateRequest request
 	) {
 		return ApiResponse.success(healthAssistantService.addWeight(userId, request));
-	}
-
-	@PostMapping("/api/v1/records/blood-pressure")
-	public ApiResponse<AppContracts.RecordSimpleResponse> addBloodPressure(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
-			@Valid @RequestBody AppContracts.BloodPressureCreateRequest request
-	) {
-		return ApiResponse.success(healthAssistantService.addBloodPressure(userId, request));
 	}
 
 	@PostMapping("/api/v1/records/flares")
@@ -226,18 +230,22 @@ public class CoreController {
 		return ApiResponse.success(healthAssistantService.getTimeline(userId));
 	}
 
-	@GetMapping("/api/v1/records/blood-pressure")
-	public ApiResponse<List<AppContracts.BloodPressureRecordResponse>> listBloodPressureRecords(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.listBloodPressureRecords(userId));
-	}
-
 	@GetMapping("/api/v1/dashboard/overview")
 	public ApiResponse<AppContracts.DashboardOverviewResponse> getOverview(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
 		return ApiResponse.success(healthAssistantService.getOverview(userId));
+	}
+
+	@GetMapping("/api/v1/mvp/metrics/summary")
+	public ApiResponse<AppContracts.MvpMetricsSummaryResponse> getMvpMetricsSummary(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestParam(defaultValue = "7")
+			@Min(value = 1, message = "days 不能小于1")
+			@Max(value = 30, message = "days 不能大于30")
+			int days
+	) {
+		return ApiResponse.success(healthAssistantService.getMvpMetricsSummary(userId, days));
 	}
 
 	@GetMapping("/api/v1/dashboard/trends")
@@ -260,6 +268,17 @@ public class CoreController {
 			int days
 	) {
 		return ApiResponse.success(healthAssistantService.getDailySummaries(userId, days));
+	}
+
+	@GetMapping("/api/v1/analysis/uric-acid-causes")
+	public ApiResponse<AppContracts.UricAcidCauseAnalysisResponse> getLatestUricAcidCauseAnalysis(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestParam(defaultValue = "7")
+			@Min(value = 1, message = "lookbackDays 不能小于1")
+			@Max(value = 30, message = "lookbackDays 不能大于30")
+			int lookbackDays
+	) {
+		return ApiResponse.success(healthAssistantService.getLatestUricAcidCauseAnalysis(userId, lookbackDays));
 	}
 
 	@GetMapping("/api/v1/reminders")
@@ -338,6 +357,7 @@ public class CoreController {
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@Valid @RequestBody AppContracts.FamilyInviteCreateRequest request
 	) {
+		featureAccessService.ensureFamilyEnabled();
 		return ApiResponse.success(healthAssistantService.createFamilyInvite(userId, request));
 	}
 
@@ -345,6 +365,7 @@ public class CoreController {
 	public ApiResponse<List<AppContracts.FamilyInviteResponse>> listFamilyInvites(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
+		featureAccessService.ensureFamilyEnabled();
 		return ApiResponse.success(healthAssistantService.listFamilyInvites(userId));
 	}
 
@@ -353,6 +374,7 @@ public class CoreController {
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@PathVariable String inviteCode
 	) {
+		featureAccessService.ensureFamilyEnabled();
 		return ApiResponse.success(healthAssistantService.acceptFamilyInvite(userId, inviteCode));
 	}
 
@@ -361,6 +383,7 @@ public class CoreController {
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@PathVariable String inviteCode
 	) {
+		featureAccessService.ensureFamilyEnabled();
 		return ApiResponse.success(healthAssistantService.cancelFamilyInvite(userId, inviteCode));
 	}
 
@@ -368,6 +391,7 @@ public class CoreController {
 	public ApiResponse<AppContracts.FamilyMembersResponse> getFamilyMembers(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
+		featureAccessService.ensureFamilyEnabled();
 		return ApiResponse.success(healthAssistantService.getFamilyMembers(userId));
 	}
 
@@ -376,6 +400,7 @@ public class CoreController {
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@PathVariable String bindingCode
 	) {
+		featureAccessService.ensureFamilyEnabled();
 		return ApiResponse.success(healthAssistantService.removeFamilyBinding(userId, bindingCode));
 	}
 
@@ -383,6 +408,7 @@ public class CoreController {
 	public ApiResponse<List<AppContracts.FamilyAlertResponse>> getFamilyAlerts(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
+		featureAccessService.ensureFamilyEnabled();
 		return ApiResponse.success(healthAssistantService.getFamilyAlerts(userId));
 	}
 
@@ -391,122 +417,8 @@ public class CoreController {
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@PathVariable String patientUserId
 	) {
+		featureAccessService.ensureFamilyEnabled();
 		return ApiResponse.success(healthAssistantService.getFamilyPatientSummary(userId, patientUserId));
-	}
-
-	@PostMapping("/api/v1/devices")
-	public ApiResponse<AppContracts.DeviceBindingResponse> bindDevice(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
-			@Valid @RequestBody AppContracts.DeviceBindingCreateRequest request
-	) {
-		return ApiResponse.success(healthAssistantService.bindDevice(userId, request));
-	}
-
-	@GetMapping("/api/v1/devices")
-	public ApiResponse<List<AppContracts.DeviceBindingResponse>> listDevices(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.listDevices(userId));
-	}
-
-	@GetMapping("/api/v1/devices/catalog")
-	public ApiResponse<List<AppContracts.DeviceCatalogItemResponse>> listDeviceCatalog(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.listDeviceCatalog(userId));
-	}
-
-	@GetMapping("/api/v1/devices/overview")
-	public ApiResponse<AppContracts.DeviceOverviewResponse> getDeviceOverview(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.getDeviceOverview(userId));
-	}
-
-	@DeleteMapping("/api/v1/devices/{deviceCode}")
-	public ApiResponse<AppContracts.DeviceBindingResponse> unbindDevice(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
-			@PathVariable String deviceCode
-	) {
-		return ApiResponse.success(healthAssistantService.unbindDevice(userId, deviceCode));
-	}
-
-	@PostMapping("/api/v1/devices/{deviceCode}/sync")
-	public ApiResponse<AppContracts.DeviceSyncBatchResponse> syncDeviceData(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
-			@PathVariable String deviceCode,
-			@Valid @RequestBody AppContracts.DeviceSyncBatchRequest request
-	) {
-		return ApiResponse.success(healthAssistantService.syncDeviceData(userId, deviceCode, request));
-	}
-
-	@GetMapping("/api/v1/devices/{deviceCode}/sync-events")
-	public ApiResponse<List<AppContracts.DeviceSyncResultResponse>> listDeviceSyncEvents(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
-			@PathVariable String deviceCode
-	) {
-		return ApiResponse.success(healthAssistantService.listDeviceSyncEvents(userId, deviceCode));
-	}
-
-	@GetMapping("/api/v1/growth/overview")
-	public ApiResponse<AppContracts.GrowthOverviewResponse> getGrowthOverview(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.getGrowthOverview(userId));
-	}
-
-	@GetMapping("/api/v1/growth/tasks")
-	public ApiResponse<List<AppContracts.GrowthTaskResponse>> getGrowthTasks(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.getGrowthTasks(userId));
-	}
-
-	@GetMapping("/api/v1/growth/weekly-plan")
-	public ApiResponse<AppContracts.GrowthWeeklyPlanResponse> getGrowthWeeklyPlan(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.getGrowthWeeklyPlan(userId));
-	}
-
-	@GetMapping("/api/v1/growth/rewards")
-	public ApiResponse<List<AppContracts.GrowthRewardResponse>> getGrowthRewards(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.getGrowthRewards(userId));
-	}
-
-	@PostMapping("/api/v1/growth/rewards/{rewardKey}/claim")
-	public ApiResponse<AppContracts.GrowthRewardClaimResponse> claimGrowthReward(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
-			@PathVariable String rewardKey
-	) {
-		return ApiResponse.success(healthAssistantService.claimGrowthReward(userId, rewardKey));
-	}
-
-	@GetMapping("/api/v1/growth/reward-claims")
-	public ApiResponse<List<AppContracts.GrowthRewardClaimResponse>> getGrowthRewardClaims(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.getGrowthRewardClaims(userId));
-	}
-
-	@GetMapping("/api/v1/growth/points")
-	public ApiResponse<List<AppContracts.GrowthPointLogResponse>> getGrowthPointLogs(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
-			@RequestParam(defaultValue = "20")
-			@Min(value = 1, message = "limit 不能小于1")
-			@Max(value = 50, message = "limit 不能大于50")
-			int limit
-	) {
-		return ApiResponse.success(healthAssistantService.getGrowthPointLogs(userId, limit));
-	}
-
-	@GetMapping("/api/v1/growth/badges")
-	public ApiResponse<List<AppContracts.GrowthBadgeResponse>> getGrowthBadges(
-			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
-	) {
-		return ApiResponse.success(healthAssistantService.getGrowthBadges(userId));
 	}
 
 	@GetMapping("/api/v1/medications")

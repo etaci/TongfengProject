@@ -70,6 +70,19 @@ public final class AppContracts {
 	) {
 	}
 
+	public record FeatureStatusResponse(
+			String featureKey,
+			String displayName,
+			boolean enabled,
+			String note
+	) {
+	}
+
+	public record AppCapabilitiesResponse(
+			List<FeatureStatusResponse> features
+	) {
+	}
+
 	public record FileUploadResponse(
 			String fileId,
 			String fileName,
@@ -133,25 +146,6 @@ public final class AppContracts {
 	) {
 	}
 
-	public record BloodPressureCreateRequest(
-			@NotNull(message = "收缩压不能为空")
-			@Min(value = 60, message = "收缩压不能低于60")
-			@Max(value = 260, message = "收缩压不能高于260")
-			Integer systolicPressure,
-			@NotNull(message = "舒张压不能为空")
-			@Min(value = 40, message = "舒张压不能低于40")
-			@Max(value = 180, message = "舒张压不能高于180")
-			Integer diastolicPressure,
-			@Min(value = 30, message = "脉搏不能低于30")
-			@Max(value = 240, message = "脉搏不能高于240")
-			Integer pulseRate,
-			String unit,
-			Instant measuredAt,
-			String source,
-			String note
-	) {
-	}
-
 	public record FlareCreateRequest(
 			@NotBlank(message = "发作部位不能为空")
 			String joint,
@@ -199,19 +193,6 @@ public final class AppContracts {
 	public record WeightRecordResponse(
 			String recordId,
 			BigDecimal value,
-			String unit,
-			Instant measuredAt,
-			String source,
-			String note,
-			RiskLevel riskLevel
-	) {
-	}
-
-	public record BloodPressureRecordResponse(
-			String recordId,
-			Integer systolicPressure,
-			Integer diastolicPressure,
-			Integer pulseRate,
 			String unit,
 			Instant measuredAt,
 			String source,
@@ -300,9 +281,6 @@ public final class AppContracts {
 			String unit,
 			Instant measuredAt,
 			String source,
-			Integer systolicPressure,
-			Integer diastolicPressure,
-			Integer pulseRate,
 			Integer waterIntakeMl,
 			Integer urineColorLevel,
 			Instant checkedAt,
@@ -387,6 +365,44 @@ public final class AppContracts {
 			List<TrendPoint> uricAcid,
 			List<TrendPoint> weight,
 			List<TrendPoint> hydration
+	) {
+	}
+
+	public record UricAcidCauseAnalysisResponse(
+			int lookbackDays,
+			Integer latestUricAcidValue,
+			String latestUricAcidUnit,
+			Instant measuredAt,
+			Integer targetUricAcidValue,
+			RiskLevel overallRiskLevel,
+			String summary,
+			List<RiskFactorResponse> factors,
+			List<String> nextActions,
+			Instant generatedAt
+	) {
+	}
+
+	public record MvpMetricBreakdownItemResponse(
+			String eventType,
+			String label,
+			long totalEvents,
+			long uniqueUsers,
+			Instant latestEventAt
+	) {
+	}
+
+	public record MvpMetricsSummaryResponse(
+			int days,
+			long totalEvents,
+			long activeUsers,
+			long mealAnalyzeUsers,
+			long uricAcidRecordUsers,
+			long labReportUsers,
+			long familyInviteUsers,
+			long familyAcceptUsers,
+			long familySummaryUsers,
+			List<MvpMetricBreakdownItemResponse> eventBreakdown,
+			Instant generatedAt
 	) {
 	}
 
@@ -598,205 +614,6 @@ public final class AppContracts {
 			String lastUricAcidUnit,
 			List<String> nextActions,
 			Instant generatedAt
-	) {
-	}
-
-	public record DeviceBindingCreateRequest(
-			@NotBlank(message = "设备类型不能为空")
-			String deviceType,
-			@NotBlank(message = "厂商不能为空")
-			String vendorName,
-			String deviceModel,
-			@NotBlank(message = "序列号不能为空")
-			String serialNumber,
-			String aliasName
-	) {
-	}
-
-	public record DeviceBindingResponse(
-			String deviceCode,
-			String deviceType,
-			String vendorName,
-			String deviceModel,
-			String serialNumber,
-			String aliasName,
-			String vendorProfileCode,
-			List<String> supportedMetricTypes,
-			String status,
-			Instant lastSyncedAt,
-			Instant createdAt
-	) {
-	}
-
-	public record DeviceCatalogItemResponse(
-			String profileCode,
-			String deviceType,
-			String deviceTypeName,
-			String vendorName,
-			String deviceModel,
-			List<String> supportedMetricTypes,
-			String bindingHint
-	) {
-	}
-
-	public record DeviceOverviewItemResponse(
-			String deviceCode,
-			String aliasName,
-			String deviceType,
-			String deviceTypeName,
-			String vendorName,
-			String deviceModel,
-			String status,
-			List<String> supportedMetricTypes,
-			int totalSyncCount,
-			String latestMetricType,
-			String latestSummary,
-			String syncHealthStatus,
-			Instant lastSyncedAt
-	) {
-	}
-
-	public record DeviceOverviewResponse(
-			int totalDevices,
-			int activeDevices,
-			int recentlySyncedDevices,
-			int attentionDevices,
-			List<DeviceOverviewItemResponse> devices
-	) {
-	}
-
-	public record DeviceSyncItemRequest(
-			@NotBlank(message = "指标类型不能为空")
-			String metricType,
-			@NotBlank(message = "外部事件ID不能为空")
-			String externalEventId,
-			Instant measuredAt,
-			BigDecimal value,
-			String unit,
-			Integer waterIntakeMl,
-			Integer urineColorLevel,
-			Integer systolicPressure,
-			Integer diastolicPressure,
-			Integer pulseRate,
-			String note
-	) {
-	}
-
-	public record DeviceSyncBatchRequest(
-			@NotEmpty(message = "同步数据不能为空")
-			List<@Valid DeviceSyncItemRequest> items
-	) {
-	}
-
-	public record DeviceSyncResultResponse(
-			String syncCode,
-			String metricType,
-			String syncStatus,
-			String resultRecordId,
-			String summary,
-			Instant measuredAt
-	) {
-	}
-
-	public record DeviceSyncBatchResponse(
-			String deviceCode,
-			int syncedCount,
-			List<DeviceSyncResultResponse> results,
-			Instant lastSyncedAt
-	) {
-	}
-
-	public record GrowthOverviewResponse(
-			String userId,
-			int level,
-			String levelTitle,
-			int totalPoints,
-			int redeemablePoints,
-			int currentLevelMinPoints,
-			Integer nextLevelPoints,
-			int currentStreakDays,
-			int longestStreakDays,
-			int todayPoints,
-			int badgesCount,
-			List<String> highlights
-	) {
-	}
-
-	public record GrowthTaskResponse(
-			String taskCode,
-			String title,
-			String description,
-			int rewardPoints,
-			int completedCount,
-			int targetCount,
-			boolean completed
-	) {
-	}
-
-	public record GrowthBadgeResponse(
-			String badgeKey,
-			String badgeName,
-			String badgeDescription,
-			Instant awardedAt
-	) {
-	}
-
-	public record GrowthPointLogResponse(
-			String pointId,
-			String actionType,
-			int points,
-			String summary,
-			String awardedDate,
-			Instant createdAt
-	) {
-	}
-
-	public record GrowthChallengeResponse(
-			String challengeCode,
-			String category,
-			String title,
-			String description,
-			int rewardPoints,
-			int completedCount,
-			int targetCount,
-			String priority,
-			boolean completed,
-			List<String> hints
-	) {
-	}
-
-	public record GrowthWeeklyPlanResponse(
-			String weekStartDate,
-			String weekEndDate,
-			int weeklyEarnedPoints,
-			int targetPoints,
-			int progressPercent,
-			List<GrowthChallengeResponse> challenges
-	) {
-	}
-
-	public record GrowthRewardResponse(
-			String rewardKey,
-			String rewardName,
-			String rewardDescription,
-			String rewardType,
-			int pointsCost,
-			int remainingClaims,
-			boolean claimable,
-			String claimHint
-	) {
-	}
-
-	public record GrowthRewardClaimResponse(
-			String claimCode,
-			String rewardKey,
-			String rewardName,
-			String rewardType,
-			int pointsCost,
-			int remainingPoints,
-			String status,
-			String claimNote,
-			Instant claimedAt
 	) {
 	}
 

@@ -2,7 +2,6 @@ package com.tongfeng.backend.app;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.tongfeng.backend.app.persistence.entity.AuthSessionEntity;
-import com.tongfeng.backend.app.persistence.entity.BloodPressureRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.FlareRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.HydrationRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.LabReportRecordEntity;
@@ -14,7 +13,6 @@ import com.tongfeng.backend.app.persistence.entity.UserAccountEntity;
 import com.tongfeng.backend.app.persistence.entity.UserProfileEntity;
 import com.tongfeng.backend.app.persistence.entity.WeightRecordEntity;
 import com.tongfeng.backend.app.persistence.repo.AuthSessionRepository;
-import com.tongfeng.backend.app.persistence.repo.BloodPressureRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.FlareRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.HydrationRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.LabReportRecordRepository;
@@ -32,6 +30,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,7 +62,6 @@ public class HealthAssistantService {
 	private final MealRecordRepository mealRecordRepository;
 	private final UricAcidRecordRepository uricAcidRecordRepository;
 	private final WeightRecordRepository weightRecordRepository;
-	private final BloodPressureRecordRepository bloodPressureRecordRepository;
 	private final FlareRecordRepository flareRecordRepository;
 	private final HydrationRecordRepository hydrationRecordRepository;
 	private final LabReportRecordRepository labReportRecordRepository;
@@ -77,9 +75,9 @@ public class HealthAssistantService {
 	private final HealthRuleEngineService healthRuleEngineService;
 	private final ProactiveCareService proactiveCareService;
 	private final FamilyCareService familyCareService;
-	private final DeviceIntegrationService deviceIntegrationService;
 	private final RecordCenterService recordCenterService;
-	private final GrowthIncentiveService growthIncentiveService;
+	private final UricAcidAnalysisService uricAcidAnalysisService;
+	private final MvpMetricsService mvpMetricsService;
 
 	public HealthAssistantService(
 			UserAccountRepository userAccountRepository,
@@ -89,7 +87,6 @@ public class HealthAssistantService {
 			MealRecordRepository mealRecordRepository,
 			UricAcidRecordRepository uricAcidRecordRepository,
 			WeightRecordRepository weightRecordRepository,
-			BloodPressureRecordRepository bloodPressureRecordRepository,
 			FlareRecordRepository flareRecordRepository,
 			HydrationRecordRepository hydrationRecordRepository,
 			LabReportRecordRepository labReportRecordRepository,
@@ -103,9 +100,9 @@ public class HealthAssistantService {
 			HealthRuleEngineService healthRuleEngineService,
 			ProactiveCareService proactiveCareService,
 			FamilyCareService familyCareService,
-			DeviceIntegrationService deviceIntegrationService,
 			RecordCenterService recordCenterService,
-			GrowthIncentiveService growthIncentiveService
+			UricAcidAnalysisService uricAcidAnalysisService,
+			MvpMetricsService mvpMetricsService
 	) {
 		this.userAccountRepository = userAccountRepository;
 		this.userProfileRepository = userProfileRepository;
@@ -114,7 +111,6 @@ public class HealthAssistantService {
 		this.mealRecordRepository = mealRecordRepository;
 		this.uricAcidRecordRepository = uricAcidRecordRepository;
 		this.weightRecordRepository = weightRecordRepository;
-		this.bloodPressureRecordRepository = bloodPressureRecordRepository;
 		this.flareRecordRepository = flareRecordRepository;
 		this.hydrationRecordRepository = hydrationRecordRepository;
 		this.labReportRecordRepository = labReportRecordRepository;
@@ -128,9 +124,9 @@ public class HealthAssistantService {
 		this.healthRuleEngineService = healthRuleEngineService;
 		this.proactiveCareService = proactiveCareService;
 		this.familyCareService = familyCareService;
-		this.deviceIntegrationService = deviceIntegrationService;
 		this.recordCenterService = recordCenterService;
-		this.growthIncentiveService = growthIncentiveService;
+		this.uricAcidAnalysisService = uricAcidAnalysisService;
+		this.mvpMetricsService = mvpMetricsService;
 	}
 
 	@Transactional
@@ -262,11 +258,16 @@ public class HealthAssistantService {
 		recordEntity.setSummaryText(aiResult.summary());
 		mealRecordRepository.save(recordEntity);
 		refreshInsightState(userId);
-		growthIncentiveService.awardRecordAction(
+		mvpMetricsService.recordEvent(
 				userId,
-				GrowthIncentiveService.ACTION_MEAL_ANALYZE,
-				recordEntity.getRecordCode(),
-				"完成一次饮食识别"
+				MvpMetricsService.EVENT_MEAL_ANALYZED,
+				"analysis",
+				recordEntity.getTakenAt(),
+				eventPayload(
+						"recordId", recordEntity.getRecordCode(),
+						"mealType", recordEntity.getMealType(),
+						"riskLevel", recordEntity.getRiskLevel()
+				)
 		);
 		return new AppContracts.MealAnalyzeResponse(
 				recordEntity.getRecordCode(),
@@ -322,13 +323,19 @@ public class HealthAssistantService {
 		entity.setSourceName(request.source());
 		entity.setNoteText(request.note());
 		uricAcidRecordRepository.save(entity);
-		refreshInsightState(userId);
-		growthIncentiveService.awardRecordAction(
+		mvpMetricsService.recordEvent(
 				userId,
-				GrowthIncentiveService.ACTION_URIC_ACID_RECORD,
-				entity.getRecordCode(),
-				"新增一条尿酸记录"
+				MvpMetricsService.EVENT_URIC_ACID_RECORDED,
+				"records",
+				entity.getMeasuredAt(),
+				eventPayload(
+						"recordId", entity.getRecordCode(),
+						"value", entity.getUaValue(),
+						"unit", entity.getUaUnit(),
+						"source", entity.getSourceName()
+				)
 		);
+		refreshInsightState(userId);
 		return new AppContracts.RecordSimpleResponse(entity.getRecordCode(), entity.getMeasuredAt(), "尿酸记录已保存");
 	}
 
@@ -343,41 +350,12 @@ public class HealthAssistantService {
 		entity.setNoteText(request.note());
 		weightRecordRepository.save(entity);
 		refreshInsightState(userId);
-		growthIncentiveService.awardRecordAction(
-				userId,
-				GrowthIncentiveService.ACTION_WEIGHT_RECORD,
-				entity.getRecordCode(),
-				"新增一条体重记录"
-		);
 		return new AppContracts.RecordSimpleResponse(entity.getRecordCode(), entity.getMeasuredAt(), "体重记录已保存");
 	}
 
 	@Transactional
 	public AppContracts.RecordSimpleResponse addFlare(String userId, AppContracts.FlareCreateRequest request) {
 		return addFlareInternal(userId, request);
-	}
-
-	@Transactional
-	public AppContracts.RecordSimpleResponse addBloodPressure(String userId, AppContracts.BloodPressureCreateRequest request) {
-		BloodPressureRecordEntity entity = new BloodPressureRecordEntity();
-		entity.setRecordCode(idGenerator.next("bp"));
-		entity.setUserCode(userId);
-		entity.setSystolicPressure(request.systolicPressure());
-		entity.setDiastolicPressure(request.diastolicPressure());
-		entity.setPulseRate(request.pulseRate());
-		entity.setUnit(StringUtils.hasText(request.unit()) ? request.unit().trim() : "mmHg");
-		entity.setMeasuredAt(request.measuredAt() == null ? Instant.now() : request.measuredAt());
-		entity.setSourceName(request.source());
-		entity.setNoteText(request.note());
-		bloodPressureRecordRepository.save(entity);
-		refreshInsightState(userId);
-		growthIncentiveService.awardRecordAction(
-				userId,
-				GrowthIncentiveService.ACTION_BLOOD_PRESSURE_RECORD,
-				entity.getRecordCode(),
-				"新增一条血压记录"
-		);
-		return new AppContracts.RecordSimpleResponse(entity.getRecordCode(), entity.getMeasuredAt(), "血压记录已保存");
 	}
 
 	private AppContracts.RecordSimpleResponse addFlareInternal(String userId, AppContracts.FlareCreateRequest request) {
@@ -391,12 +369,6 @@ public class HealthAssistantService {
 		entity.setNoteText(request.note());
 		flareRecordRepository.save(entity);
 		refreshInsightState(userId);
-		growthIncentiveService.awardRecordAction(
-				userId,
-				GrowthIncentiveService.ACTION_FLARE_RECORD,
-				entity.getRecordCode(),
-				"新增一次发作记录"
-		);
 		return new AppContracts.RecordSimpleResponse(entity.getRecordCode(), entity.getStartedAt(), "发作记录已保存");
 	}
 
@@ -411,29 +383,7 @@ public class HealthAssistantService {
 		entity.setNoteText(request.note());
 		hydrationRecordRepository.save(entity);
 		refreshInsightState(userId);
-		growthIncentiveService.awardRecordAction(
-				userId,
-				GrowthIncentiveService.ACTION_HYDRATION_RECORD,
-				entity.getRecordCode(),
-				"完成一次补水打卡"
-		);
 		return new AppContracts.RecordSimpleResponse(entity.getRecordCode(), entity.getCheckedAt(), "饮水/尿液打卡已保存");
-	}
-
-	public List<AppContracts.BloodPressureRecordResponse> listBloodPressureRecords(String userId) {
-		return bloodPressureRecordRepository.findByUserCodeOrderByMeasuredAtDesc(userId).stream()
-				.map(record -> new AppContracts.BloodPressureRecordResponse(
-						record.getRecordCode(),
-						record.getSystolicPressure(),
-						record.getDiastolicPressure(),
-						record.getPulseRate(),
-						record.getUnit(),
-						record.getMeasuredAt(),
-						record.getSourceName(),
-						record.getNoteText(),
-						bloodPressureRisk(record.getSystolicPressure(), record.getDiastolicPressure())
-				))
-				.toList();
 	}
 
 	public AppContracts.HealthRecordCenterResponse getRecordCenter(String userId, List<String> types, int limit, String cursor) {
@@ -514,6 +464,11 @@ public class HealthAssistantService {
 		);
 	}
 
+	public AppContracts.MvpMetricsSummaryResponse getMvpMetricsSummary(String userId, int days) {
+		ensureProfile(userId);
+		return mvpMetricsService.getSummary(days);
+	}
+
 	public AppContracts.TrendResponse getTrends(String userId, int days) {
 		Instant begin = Instant.now().minus(Math.max(days, 1), ChronoUnit.DAYS);
 		List<AppContracts.TrendPoint> uricAcid = uricAcidRecordRepository.findByUserCodeOrderByMeasuredAtDesc(userId).stream()
@@ -578,17 +533,6 @@ public class HealthAssistantService {
 						AppContracts.RiskLevel.GREEN
 				)
 		));
-		bloodPressureRecordRepository.findByUserCodeOrderByMeasuredAtDesc(userId).forEach(record -> events.add(
-				new AppContracts.TimelineEvent(
-						record.getRecordCode(),
-						"BLOOD_PRESSURE",
-						"血压记录",
-						record.getSystolicPressure() + "/" + record.getDiastolicPressure() + " " + record.getUnit()
-								+ (record.getPulseRate() == null ? "" : " / 脉搏 " + record.getPulseRate()),
-						record.getMeasuredAt(),
-						bloodPressureRisk(record.getSystolicPressure(), record.getDiastolicPressure())
-				)
-		));
 		flareRecordRepository.findByUserCodeOrderByStartedAtDesc(userId).forEach(record -> events.add(
 				new AppContracts.TimelineEvent(
 						record.getRecordCode(),
@@ -623,6 +567,11 @@ public class HealthAssistantService {
 		return new AppContracts.TimelineResponse(events);
 	}
 
+	public AppContracts.UricAcidCauseAnalysisResponse getLatestUricAcidCauseAnalysis(String userId, int lookbackDays) {
+		ensureProfile(userId);
+		return uricAcidAnalysisService.analyzeLatest(userId, lookbackDays);
+	}
+
 	public List<AppContracts.ReminderResponse> getReminders(String userId) {
 		return healthRuleEngineService.getActiveReminders(userId);
 	}
@@ -642,13 +591,18 @@ public class HealthAssistantService {
 		entity.setSuggestionsJson(jsonCodec.toJson(safeList(aiResult.suggestions())));
 		entity.setSummaryText(aiResult.summary());
 		labReportRecordRepository.save(entity);
-		refreshInsightState(userId);
-		growthIncentiveService.awardRecordAction(
+		mvpMetricsService.recordEvent(
 				userId,
-				GrowthIncentiveService.ACTION_LAB_REPORT,
-				entity.getReportCode(),
-				"完成一次化验单解析"
+				MvpMetricsService.EVENT_LAB_REPORT_ANALYZED,
+				"assistant",
+				entity.getReportDate().atStartOfDay(ZoneId.systemDefault()).toInstant(),
+				eventPayload(
+						"reportCode", entity.getReportCode(),
+						"riskLevel", entity.getOverallRiskLevel(),
+						"indicatorCount", safeIndicators(aiResult.indicators()).size()
+				)
 		);
+		refreshInsightState(userId);
 		return toLabReportResponse(entity);
 	}
 
@@ -661,11 +615,6 @@ public class HealthAssistantService {
 	@Transactional
 	public AppContracts.KnowledgeAnswerResponse askKnowledge(String userId, AppContracts.AskKnowledgeRequest request) {
 		ensureProfile(userId);
-		growthIncentiveService.awardDailyAction(
-				userId,
-				GrowthIncentiveService.ACTION_KNOWLEDGE_ASK,
-				"完成一次知识问答"
-		);
 		return aiServiceClient.askKnowledge(request.question(), request.scene());
 	}
 
@@ -730,11 +679,6 @@ public class HealthAssistantService {
 		ensureProfile(userId);
 		AppContracts.ProactiveCareSettingsResponse response = proactiveCareService.updateSettings(userId, request);
 		refreshInsightState(userId);
-		growthIncentiveService.awardDailyAction(
-				userId,
-				GrowthIncentiveService.ACTION_PROACTIVE_SETTINGS,
-				"更新主动管理设置"
-		);
 		return response;
 	}
 
@@ -751,7 +695,19 @@ public class HealthAssistantService {
 	@Transactional
 	public AppContracts.FamilyInviteResponse createFamilyInvite(String userId, AppContracts.FamilyInviteCreateRequest request) {
 		ensureProfile(userId);
-		return familyCareService.createInvite(userId, request);
+		AppContracts.FamilyInviteResponse response = familyCareService.createInvite(userId, request);
+		mvpMetricsService.recordEvent(
+				userId,
+				MvpMetricsService.EVENT_FAMILY_INVITE_CREATED,
+				"family",
+				response.createdAt(),
+				eventPayload(
+						"inviteCode", response.inviteCode(),
+						"relationType", response.relationType(),
+						"patientUserId", response.patientUserId()
+				)
+		);
+		return response;
 	}
 
 	public List<AppContracts.FamilyInviteResponse> listFamilyInvites(String userId) {
@@ -763,17 +719,16 @@ public class HealthAssistantService {
 	public AppContracts.FamilyInviteResponse acceptFamilyInvite(String userId, String inviteCode) {
 		ensureProfile(userId);
 		AppContracts.FamilyInviteResponse response = familyCareService.acceptInvite(userId, inviteCode);
-		growthIncentiveService.awardRecordAction(
+		mvpMetricsService.recordEvent(
 				userId,
-				GrowthIncentiveService.ACTION_FAMILY_BIND,
-				"caregiver:" + response.inviteCode(),
-				"完成一次家属绑定"
-		);
-		growthIncentiveService.awardRecordAction(
-				response.patientUserId(),
-				GrowthIncentiveService.ACTION_FAMILY_BIND,
-				"patient:" + response.inviteCode(),
-				"完成一次家属绑定"
+				MvpMetricsService.EVENT_FAMILY_INVITE_ACCEPTED,
+				"family",
+				Instant.now(),
+				eventPayload(
+						"inviteCode", response.inviteCode(),
+						"patientUserId", response.patientUserId(),
+						"acceptedByUserId", userId
+				)
 		);
 		return response;
 	}
@@ -802,56 +757,19 @@ public class HealthAssistantService {
 
 	public AppContracts.FamilyPatientSummaryResponse getFamilyPatientSummary(String userId, String patientUserId) {
 		ensureProfile(userId);
-		return familyCareService.getPatientSummary(userId, patientUserId);
-	}
-
-	@Transactional
-	public AppContracts.DeviceBindingResponse bindDevice(String userId, AppContracts.DeviceBindingCreateRequest request) {
-		ensureProfile(userId);
-		AppContracts.DeviceBindingResponse response = deviceIntegrationService.bindDevice(userId, request);
-		growthIncentiveService.awardRecordAction(
+		AppContracts.FamilyPatientSummaryResponse response = familyCareService.getPatientSummary(userId, patientUserId);
+		mvpMetricsService.recordEvent(
 				userId,
-				GrowthIncentiveService.ACTION_DEVICE_BIND,
-				response.deviceCode(),
-				"接入一台健康设备"
+				MvpMetricsService.EVENT_FAMILY_PATIENT_SUMMARY_VIEWED,
+				"family",
+				Instant.now(),
+				eventPayload(
+						"patientUserId", patientUserId,
+						"patientNickname", response.patientNickname(),
+						"riskLevel", response.overallRiskLevel().name()
+				)
 		);
 		return response;
-	}
-
-	public List<AppContracts.DeviceBindingResponse> listDevices(String userId) {
-		ensureProfile(userId);
-		return deviceIntegrationService.listDevices(userId);
-	}
-
-	public List<AppContracts.DeviceCatalogItemResponse> listDeviceCatalog(String userId) {
-		ensureProfile(userId);
-		return deviceIntegrationService.listDeviceCatalog();
-	}
-
-	public AppContracts.DeviceOverviewResponse getDeviceOverview(String userId) {
-		ensureProfile(userId);
-		return deviceIntegrationService.getDeviceOverview(userId);
-	}
-
-	@Transactional
-	public AppContracts.DeviceBindingResponse unbindDevice(String userId, String deviceCode) {
-		ensureProfile(userId);
-		return deviceIntegrationService.unbindDevice(userId, deviceCode);
-	}
-
-	@Transactional
-	public AppContracts.DeviceSyncBatchResponse syncDeviceData(
-			String userId,
-			String deviceCode,
-			AppContracts.DeviceSyncBatchRequest request
-	) {
-		ensureProfile(userId);
-		return deviceIntegrationService.syncDeviceData(userId, deviceCode, request);
-	}
-
-	public List<AppContracts.DeviceSyncResultResponse> listDeviceSyncEvents(String userId, String deviceCode) {
-		ensureProfile(userId);
-		return deviceIntegrationService.listSyncEvents(userId, deviceCode);
 	}
 
 	public AppContracts.MedicationPlanResponse getMedicationPlan(String userId) {
@@ -871,62 +789,16 @@ public class HealthAssistantService {
 					MedicationPlanEntity planEntity = new MedicationPlanEntity();
 					planEntity.setUserCode(userId);
 					return planEntity;
-				});
+		});
 		entity.setCurrentMedicationsJson(jsonCodec.toJson(request.currentMedications()));
 		entity.setFollowUpNote(request.followUpNote());
 		entity.setUpdatedAt(Instant.now());
 		medicationPlanRepository.save(entity);
-		growthIncentiveService.awardDailyAction(
-				userId,
-				GrowthIncentiveService.ACTION_MEDICATION_PLAN,
-				"更新一次用药计划"
-		);
 		return new AppContracts.MedicationPlanResponse(
 				request.currentMedications(),
 				request.followUpNote(),
 				entity.getUpdatedAt()
 		);
-	}
-
-	public AppContracts.GrowthOverviewResponse getGrowthOverview(String userId) {
-		ensureProfile(userId);
-		return growthIncentiveService.getGrowthOverview(userId);
-	}
-
-	public List<AppContracts.GrowthTaskResponse> getGrowthTasks(String userId) {
-		ensureProfile(userId);
-		return growthIncentiveService.listGrowthTasks(userId);
-	}
-
-	public AppContracts.GrowthWeeklyPlanResponse getGrowthWeeklyPlan(String userId) {
-		ensureProfile(userId);
-		return growthIncentiveService.getWeeklyPlan(userId);
-	}
-
-	public List<AppContracts.GrowthRewardResponse> getGrowthRewards(String userId) {
-		ensureProfile(userId);
-		return growthIncentiveService.listRewards(userId);
-	}
-
-	@Transactional
-	public AppContracts.GrowthRewardClaimResponse claimGrowthReward(String userId, String rewardKey) {
-		ensureProfile(userId);
-		return growthIncentiveService.claimReward(userId, rewardKey);
-	}
-
-	public List<AppContracts.GrowthRewardClaimResponse> getGrowthRewardClaims(String userId) {
-		ensureProfile(userId);
-		return growthIncentiveService.listRewardClaims(userId);
-	}
-
-	public List<AppContracts.GrowthPointLogResponse> getGrowthPointLogs(String userId, int limit) {
-		ensureProfile(userId);
-		return growthIncentiveService.listPointLogs(userId, Math.min(Math.max(limit, 1), 50));
-	}
-
-	public List<AppContracts.GrowthBadgeResponse> getGrowthBadges(String userId) {
-		ensureProfile(userId);
-		return growthIncentiveService.listBadges(userId);
 	}
 
 	public List<AppContracts.DailyHealthSummaryResponse> getDailySummaries(String userId, int days) {
@@ -941,6 +813,18 @@ public class HealthAssistantService {
 	private UserProfileEntity ensureProfile(String userId) {
 		return userProfileRepository.findByUserCode(userId)
 				.orElseThrow(() -> new BusinessException("PROFILE_NOT_FOUND", "用户档案不存在，请先登录"));
+	}
+
+	private Map<String, Object> eventPayload(Object... keyValues) {
+		Map<String, Object> payload = new LinkedHashMap<>();
+		for (int index = 0; index + 1 < keyValues.length; index += 2) {
+			Object key = keyValues[index];
+			Object value = keyValues[index + 1];
+			if (key instanceof String stringKey && StringUtils.hasText(stringKey) && value != null) {
+				payload.put(stringKey, value);
+			}
+		}
+		return payload;
 	}
 
 	private StoredFileEntity persistStoredFile(String userId, MultipartFile file) {
@@ -1059,10 +943,6 @@ public class HealthAssistantService {
 		return hydrationRecordRepository.findByUserCodeOrderByCheckedAtDesc(userId).stream().findFirst();
 	}
 
-	private Optional<BloodPressureRecordEntity> latestBloodPressure(String userId) {
-		return bloodPressureRecordRepository.findByUserCodeOrderByMeasuredAtDesc(userId).stream().findFirst();
-	}
-
 	private Optional<MealRecordEntity> latestMeal(String userId) {
 		return mealRecordRepository.findByUserCodeOrderByTakenAtDesc(userId).stream().findFirst();
 	}
@@ -1088,19 +968,6 @@ public class HealthAssistantService {
 			return AppContracts.RiskLevel.RED;
 		}
 		if (value > 420) {
-			return AppContracts.RiskLevel.YELLOW;
-		}
-		return AppContracts.RiskLevel.GREEN;
-	}
-
-	private AppContracts.RiskLevel bloodPressureRisk(Integer systolicPressure, Integer diastolicPressure) {
-		if (systolicPressure == null || diastolicPressure == null) {
-			return AppContracts.RiskLevel.GREEN;
-		}
-		if (systolicPressure >= 160 || diastolicPressure >= 100) {
-			return AppContracts.RiskLevel.RED;
-		}
-		if (systolicPressure >= 140 || diastolicPressure >= 90) {
 			return AppContracts.RiskLevel.YELLOW;
 		}
 		return AppContracts.RiskLevel.GREEN;

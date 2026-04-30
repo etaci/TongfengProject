@@ -3,9 +3,7 @@ import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import StatusBanner from "./components/StatusBanner";
 import AnalysisPage from "./pages/AnalysisPage";
 import AssistantPage from "./pages/AssistantPage";
-import DevicesPage from "./pages/DevicesPage";
 import FamilyPage from "./pages/FamilyPage";
-import GrowthPage from "./pages/GrowthPage";
 import OverviewPage from "./pages/OverviewPage";
 import ProactivePage from "./pages/ProactivePage";
 import RecordsPage from "./pages/RecordsPage";
@@ -46,8 +44,8 @@ function HeroMetrics({ overview }) {
         },
         {
           label: "闭环动作",
-          value: "持续扩展中",
-          description: "家庭、设备、成长与主动关怀都已纳入同一个前端工程",
+          value: "等待同步",
+          description: "当前版本聚焦饮食识别、记录、分析与档案四条主链路",
         },
       ];
 
@@ -157,15 +155,15 @@ export default function App() {
   }, [data.recordDetail]);
 
   const familySummaryTargetName = useMemo(() => data.familyPatientSummary?.patientNickname || "", [data.familyPatientSummary]);
+  const familyFeatureEnabled = useMemo(
+    () => (data.capabilities?.features || []).some((item) => item.featureKey === "family-care" && item.enabled),
+    [data.capabilities],
+  );
   const navItems = useMemo(
     () => [
       { to: "/overview", label: "总览" },
       { to: "/records", label: "记录" },
       { to: "/analysis", label: "分析" },
-      { to: "/proactive", label: "主动关怀" },
-      { to: "/family", label: "家庭协同" },
-      { to: "/devices", label: "设备" },
-      { to: "/growth", label: "成长" },
       { to: "/assistant", label: "问答与档案" },
     ],
     [],
@@ -576,7 +574,7 @@ export default function App() {
             <p className="section-kicker">Zapier-inspired responsive dashboard</p>
             <h1>把每日指标、饮食风险、家庭协同与设备数据，放进一个可持续扩展的动态 Web 端里。</h1>
             <p className="hero-copy__lead">
-              这个版本继续沿用暖色背景、卡片承重和橙色聚焦的设计语言，并把后端新增的主动关怀、家庭协同、设备接入与成长体系统一接入到同一个前端工程中。
+              这个版本继续沿用暖色背景、卡片承重和橙色聚焦的设计语言，并把当前 MVP 主链路收敛到记录、趋势、原因分析、OCR 与家属轻协同几个核心面板中。
             </p>
             <HeroMetrics overview={data.overview} />
           </div>
@@ -638,7 +636,7 @@ export default function App() {
           />
           <Route
             path="/analysis"
-            element={<AnalysisPage data={data} busyMap={busyMap} session={session} handleMealSubmit={handleMealSubmit} handleLabSubmit={handleLabSubmit} />}
+            element={<AnalysisPage data={data} busyMap={busyMap} session={session} handleMealSubmit={handleMealSubmit} />}
           />
           <Route
             path="/proactive"
@@ -655,7 +653,7 @@ export default function App() {
           />
           <Route
             path="/family"
-            element={(
+            element={familyFeatureEnabled ? (
               <FamilyPage
                 app={app}
                 data={data}
@@ -670,35 +668,15 @@ export default function App() {
                 familySummaryTargetName={familySummaryTargetName}
                 withErrorHandling={withErrorHandling}
               />
-            )}
+            ) : <Navigate to="/overview" replace />}
           />
-          <Route
-            path="/devices"
-            element={(
-              <DevicesPage
-                app={app}
-                data={data}
-                busyMap={busyMap}
-                session={session}
-                deviceDraft={deviceDraft}
-                setDeviceDraft={setDeviceDraft}
-                handleDeviceBindingSubmit={handleDeviceBindingSubmit}
-                deviceSyncDraft={deviceSyncDraft}
-                setDeviceSyncDraft={setDeviceSyncDraft}
-                handleDeviceSyncSubmit={handleDeviceSyncSubmit}
-                deviceSyncQueue={deviceSyncQueue}
-                handleRemoveSyncQueueItem={handleRemoveSyncQueueItem}
-                handleSubmitSyncQueue={handleSubmitSyncQueue}
-                setDeviceSyncQueue={setDeviceSyncQueue}
-                withErrorHandling={withErrorHandling}
-              />
-            )}
-          />
-          <Route path="/growth" element={<GrowthPage app={app} data={data} busyMap={busyMap} withErrorHandling={withErrorHandling} />} />
+          <Route path="/devices" element={<Navigate to="/overview" replace />} />
+          <Route path="/growth" element={<Navigate to="/overview" replace />} />
           <Route
             path="/assistant"
             element={(
               <AssistantPage
+                app={app}
                 data={data}
                 busyMap={busyMap}
                 session={session}
@@ -711,6 +689,16 @@ export default function App() {
                 handleMedicationSubmit={handleMedicationSubmit}
                 handleFileUpload={handleFileUpload}
                 handleOpenFile={handleOpenFile}
+                handleLabSubmit={handleLabSubmit}
+                familyFeatureEnabled={familyFeatureEnabled}
+                inviteDraft={inviteDraft}
+                setInviteDraft={setInviteDraft}
+                handleInviteSubmit={handleInviteSubmit}
+                acceptInviteCode={acceptInviteCode}
+                setAcceptInviteCode={setAcceptInviteCode}
+                handleAcceptInvite={handleAcceptInvite}
+                familySummaryTargetName={familySummaryTargetName}
+                withErrorHandling={withErrorHandling}
               />
             )}
           />

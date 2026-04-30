@@ -34,6 +34,7 @@ import {
 import { mapMedicationToText, mapProfileToForm } from "../utils/forms";
 
 const initialData = {
+  capabilities: { features: [] },
   overview: null,
   trends: null,
   summaries: [],
@@ -45,6 +46,8 @@ const initialData = {
   labResult: null,
   knowledge: null,
   persona: null,
+  uricAcidCauseAnalysis: null,
+  mvpMetricsSummary: null,
   profile: null,
   medication: null,
   proactiveSettings: null,
@@ -82,7 +85,6 @@ const initialData = {
     weight: [],
     hydration: [],
     flares: [],
-    bloodPressure: [],
   },
 };
 
@@ -99,6 +101,11 @@ export default function useTongfengApp() {
 
   const setBusy = useCallback((key, value) => {
     setBusyMap((current) => ({ ...current, [key]: value }));
+  }, []);
+
+  const isFamilyEnabled = useCallback((capabilitiesPayload) => {
+    const features = capabilitiesPayload?.features || [];
+    return features.some((item) => item.featureKey === "family-care" && item.enabled);
   }, []);
 
   const applyExtendedPayload = useCallback((extended) => {
@@ -132,24 +139,27 @@ export default function useTongfengApp() {
         weight: responses[1].data || [],
         hydration: responses[2].data || [],
         flares: responses[3].data || [],
-        bloodPressure: responses[4].data || [],
       },
     }));
   }, []);
 
   const applyBootstrapPayload = useCallback((responses) => {
+    const capabilities = responses[0].data || { features: [] };
     setData((current) => ({
       ...current,
-      profile: responses[0].data,
-      overview: responses[1].data,
-      trends: responses[2].data,
-      summaries: responses[3].data || [],
-      reminders: responses[4].data || [],
-      meals: responses[5].data || [],
-      timeline: responses[6].data?.events || [],
-      labs: responses[7].data || [],
-      persona: responses[8].data,
-      medication: responses[9].data,
+      capabilities,
+      profile: responses[1].data,
+      overview: responses[2].data,
+      trends: responses[3].data,
+      summaries: responses[4].data || [],
+      reminders: responses[5].data || [],
+      meals: responses[6].data || [],
+      timeline: responses[7].data?.events || [],
+      labs: responses[8].data || [],
+      persona: responses[9].data,
+      uricAcidCauseAnalysis: responses[10].data,
+      medication: responses[11].data,
+      mvpMetricsSummary: responses[12].data,
     }));
   }, []);
 
@@ -163,21 +173,25 @@ export default function useTongfengApp() {
         setBanner({ tone: "neutral", message: "正在同步总览、趋势与记录列表。" });
       }
 
-      const [responses, extended, snapshots] = await Promise.all([
-        getDashboardBundle(nextSession, nextDays),
-        getExtendedData(nextSession),
+      const responses = await getDashboardBundle(nextSession, nextDays);
+      const capabilities = responses[0].data || { features: [] };
+      const [extended, snapshots] = await Promise.all([
+        getExtendedData(nextSession, { familyEnabled: isFamilyEnabled(capabilities) }),
         getRecordSnapshots(nextSession),
       ]);
       setData((current) => ({
         ...current,
-        overview: responses[0].data,
-        trends: responses[1].data,
-        summaries: responses[2].data || [],
-        reminders: responses[3].data || [],
-        meals: responses[4].data || [],
-        timeline: responses[5].data?.events || [],
-        labs: responses[6].data || [],
-        persona: responses[7].data,
+        capabilities,
+        overview: responses[1].data,
+        trends: responses[2].data,
+        summaries: responses[3].data || [],
+        reminders: responses[4].data || [],
+        meals: responses[5].data || [],
+        timeline: responses[6].data?.events || [],
+        labs: responses[7].data || [],
+        persona: responses[8].data,
+        uricAcidCauseAnalysis: responses[9].data,
+        mvpMetricsSummary: responses[10].data,
         proactiveSettings: extended.proactiveSettings,
         proactiveBrief: extended.proactiveBrief,
         flareReview: extended.flareReview,
@@ -200,7 +214,6 @@ export default function useTongfengApp() {
           weight: snapshots[1].data || [],
           hydration: snapshots[2].data || [],
           flares: snapshots[3].data || [],
-          bloodPressure: snapshots[4].data || [],
         },
       }));
 
@@ -220,9 +233,10 @@ export default function useTongfengApp() {
       setIsHydrating(true);
 
       try {
-        const [responses, extended, snapshots] = await Promise.all([
-          getBootstrapData(nextSession, nextDays),
-          getExtendedData(nextSession),
+        const responses = await getBootstrapData(nextSession, nextDays);
+        const capabilities = responses[0].data || { features: [] };
+        const [extended, snapshots] = await Promise.all([
+          getExtendedData(nextSession, { familyEnabled: isFamilyEnabled(capabilities) }),
           getRecordSnapshots(nextSession),
         ]);
         applyBootstrapPayload(responses);
@@ -241,7 +255,7 @@ export default function useTongfengApp() {
         setIsHydrating(false);
       }
     },
-    [applyBootstrapPayload, applyExtendedPayload, applyRecordSnapshots, session, trendDays],
+    [applyBootstrapPayload, applyExtendedPayload, applyRecordSnapshots, isFamilyEnabled, session, trendDays],
   );
 
   useEffect(() => {

@@ -1,13 +1,11 @@
 package com.tongfeng.backend.app;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.tongfeng.backend.app.persistence.entity.BloodPressureRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.FlareRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.HealthRecordAuditEntity;
 import com.tongfeng.backend.app.persistence.entity.HydrationRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.UricAcidRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.WeightRecordEntity;
-import com.tongfeng.backend.app.persistence.repo.BloodPressureRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.FlareRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.HealthRecordAuditRepository;
 import com.tongfeng.backend.app.persistence.repo.HydrationRecordRepository;
@@ -39,7 +37,6 @@ public class RecordCenterService {
 
 	private static final String TYPE_URIC_ACID = "URIC_ACID";
 	private static final String TYPE_WEIGHT = "WEIGHT";
-	private static final String TYPE_BLOOD_PRESSURE = "BLOOD_PRESSURE";
 	private static final String TYPE_HYDRATION = "HYDRATION";
 	private static final String TYPE_FLARE = "FLARE";
 	private static final String ACTION_UPDATE = "UPDATE";
@@ -49,14 +46,12 @@ public class RecordCenterService {
 	private static final List<String> DEFAULT_RECORD_TYPES = List.of(
 			TYPE_URIC_ACID,
 			TYPE_WEIGHT,
-			TYPE_BLOOD_PRESSURE,
 			TYPE_HYDRATION,
 			TYPE_FLARE
 	);
 
 	private final UricAcidRecordRepository uricAcidRecordRepository;
 	private final WeightRecordRepository weightRecordRepository;
-	private final BloodPressureRecordRepository bloodPressureRecordRepository;
 	private final HydrationRecordRepository hydrationRecordRepository;
 	private final FlareRecordRepository flareRecordRepository;
 	private final HealthRecordAuditRepository healthRecordAuditRepository;
@@ -67,7 +62,6 @@ public class RecordCenterService {
 	public RecordCenterService(
 			UricAcidRecordRepository uricAcidRecordRepository,
 			WeightRecordRepository weightRecordRepository,
-			BloodPressureRecordRepository bloodPressureRecordRepository,
 			HydrationRecordRepository hydrationRecordRepository,
 			FlareRecordRepository flareRecordRepository,
 			HealthRecordAuditRepository healthRecordAuditRepository,
@@ -77,7 +71,6 @@ public class RecordCenterService {
 	) {
 		this.uricAcidRecordRepository = uricAcidRecordRepository;
 		this.weightRecordRepository = weightRecordRepository;
-		this.bloodPressureRecordRepository = bloodPressureRecordRepository;
 		this.hydrationRecordRepository = hydrationRecordRepository;
 		this.flareRecordRepository = flareRecordRepository;
 		this.healthRecordAuditRepository = healthRecordAuditRepository;
@@ -176,7 +169,6 @@ public class RecordCenterService {
 		return switch (normalizedType) {
 			case TYPE_URIC_ACID -> toUricAcidDetail(requireOwnedUricAcid(userId, recordId));
 			case TYPE_WEIGHT -> toWeightDetail(requireOwnedWeight(userId, recordId));
-			case TYPE_BLOOD_PRESSURE -> toBloodPressureDetail(requireOwnedBloodPressure(userId, recordId));
 			case TYPE_HYDRATION -> toHydrationDetail(requireOwnedHydration(userId, recordId));
 			case TYPE_FLARE -> toFlareDetail(requireOwnedFlare(userId, recordId));
 			default -> throw unsupportedType(normalizedType);
@@ -197,7 +189,6 @@ public class RecordCenterService {
 		switch (normalizedType) {
 			case TYPE_URIC_ACID -> updateUricAcidRecord(requireOwnedUricAcid(userId, recordId), request);
 			case TYPE_WEIGHT -> updateWeightRecord(requireOwnedWeight(userId, recordId), request);
-			case TYPE_BLOOD_PRESSURE -> updateBloodPressureRecord(requireOwnedBloodPressure(userId, recordId), request);
 			case TYPE_HYDRATION -> updateHydrationRecord(requireOwnedHydration(userId, recordId), request);
 			case TYPE_FLARE -> updateFlareRecord(requireOwnedFlare(userId, recordId), request);
 			default -> throw unsupportedType(normalizedType);
@@ -298,7 +289,6 @@ public class RecordCenterService {
 		switch (normalizedType) {
 			case TYPE_URIC_ACID -> uricAcidRecordRepository.delete(requireOwnedUricAcid(userId, recordId));
 			case TYPE_WEIGHT -> weightRecordRepository.delete(requireOwnedWeight(userId, recordId));
-			case TYPE_BLOOD_PRESSURE -> bloodPressureRecordRepository.delete(requireOwnedBloodPressure(userId, recordId));
 			case TYPE_HYDRATION -> hydrationRecordRepository.delete(requireOwnedHydration(userId, recordId));
 			case TYPE_FLARE -> flareRecordRepository.delete(requireOwnedFlare(userId, recordId));
 			default -> throw unsupportedType(normalizedType);
@@ -334,10 +324,6 @@ public class RecordCenterService {
 		if (types.contains(TYPE_WEIGHT)) {
 			weightRecordRepository.findByUserCodeOrderByMeasuredAtDesc(userId)
 					.forEach(record -> items.add(toWeightCenterItem(record)));
-		}
-		if (types.contains(TYPE_BLOOD_PRESSURE)) {
-			bloodPressureRecordRepository.findByUserCodeOrderByMeasuredAtDesc(userId)
-					.forEach(record -> items.add(toBloodPressureCenterItem(record)));
 		}
 		if (types.contains(TYPE_HYDRATION)) {
 			hydrationRecordRepository.findByUserCodeOrderByCheckedAtDesc(userId)
@@ -415,24 +401,6 @@ public class RecordCenterService {
 		);
 	}
 
-	private AppContracts.HealthRecordCenterItemResponse toBloodPressureCenterItem(BloodPressureRecordEntity record) {
-		List<String> tags = new ArrayList<>();
-		tags.add(record.getUnit());
-		if (record.getPulseRate() != null) {
-			tags.add("脉搏 " + record.getPulseRate());
-		}
-		return new AppContracts.HealthRecordCenterItemResponse(
-				record.getRecordCode(),
-				TYPE_BLOOD_PRESSURE,
-				"血压记录",
-				record.getSystolicPressure() + "/" + record.getDiastolicPressure() + " " + record.getUnit(),
-				record.getMeasuredAt(),
-				bloodPressureRisk(record.getSystolicPressure(), record.getDiastolicPressure()),
-				record.getSourceName(),
-				tags
-		);
-	}
-
 	private AppContracts.HealthRecordCenterItemResponse toHydrationCenterItem(HydrationRecordEntity record) {
 		return new AppContracts.HealthRecordCenterItemResponse(
 				record.getRecordCode(),
@@ -494,34 +462,6 @@ public class RecordCenterService {
 						new AppContracts.HealthRecordDetailFieldResponse("unit", "单位", "kg"),
 						new AppContracts.HealthRecordDetailFieldResponse("measuredAt", "记录时间", record.getMeasuredAt().toString())
 				)
-		);
-	}
-
-	private AppContracts.HealthRecordDetailResponse toBloodPressureDetail(BloodPressureRecordEntity record) {
-		List<AppContracts.HealthRecordDetailFieldResponse> fields = new ArrayList<>();
-		fields.add(new AppContracts.HealthRecordDetailFieldResponse("systolicPressure", "收缩压", String.valueOf(record.getSystolicPressure())));
-		fields.add(new AppContracts.HealthRecordDetailFieldResponse("diastolicPressure", "舒张压", String.valueOf(record.getDiastolicPressure())));
-		fields.add(new AppContracts.HealthRecordDetailFieldResponse("unit", "单位", record.getUnit()));
-		fields.add(new AppContracts.HealthRecordDetailFieldResponse("measuredAt", "记录时间", record.getMeasuredAt().toString()));
-		if (record.getPulseRate() != null) {
-			fields.add(new AppContracts.HealthRecordDetailFieldResponse("pulseRate", "脉搏", String.valueOf(record.getPulseRate())));
-		}
-		List<String> tags = new ArrayList<>();
-		tags.add(record.getUnit());
-		if (record.getPulseRate() != null) {
-			tags.add("脉搏 " + record.getPulseRate());
-		}
-		return new AppContracts.HealthRecordDetailResponse(
-				record.getRecordCode(),
-				TYPE_BLOOD_PRESSURE,
-				"血压记录详情",
-				record.getSystolicPressure() + "/" + record.getDiastolicPressure() + " " + record.getUnit(),
-				record.getMeasuredAt(),
-				bloodPressureRisk(record.getSystolicPressure(), record.getDiastolicPressure()),
-				record.getSourceName(),
-				record.getNoteText(),
-				tags,
-				fields
 		);
 	}
 
@@ -603,34 +543,6 @@ public class RecordCenterService {
 		weightRecordRepository.save(entity);
 	}
 
-	private void updateBloodPressureRecord(BloodPressureRecordEntity entity, AppContracts.HealthRecordUpdateRequest request) {
-		if (request.systolicPressure() != null) {
-			validateRange(request.systolicPressure(), 60, 260, "收缩压必须在 60-260 之间");
-			entity.setSystolicPressure(request.systolicPressure());
-		}
-		if (request.diastolicPressure() != null) {
-			validateRange(request.diastolicPressure(), 40, 180, "舒张压必须在 40-180 之间");
-			entity.setDiastolicPressure(request.diastolicPressure());
-		}
-		if (request.pulseRate() != null) {
-			validateRange(request.pulseRate(), 30, 240, "脉搏必须在 30-240 之间");
-			entity.setPulseRate(request.pulseRate());
-		}
-		if (request.unit() != null) {
-			entity.setUnit(normalizeRequiredText(request.unit(), "血压单位不能为空"));
-		}
-		if (request.measuredAt() != null) {
-			entity.setMeasuredAt(request.measuredAt());
-		}
-		if (request.source() != null) {
-			entity.setSourceName(normalizeNullableText(request.source()));
-		}
-		if (request.note() != null) {
-			entity.setNoteText(normalizeNullableText(request.note()));
-		}
-		bloodPressureRecordRepository.save(entity);
-	}
-
 	private void updateHydrationRecord(HydrationRecordEntity entity, AppContracts.HealthRecordUpdateRequest request) {
 		if (request.waterIntakeMl() != null) {
 			if (request.waterIntakeMl() < 0) {
@@ -680,7 +592,6 @@ public class RecordCenterService {
 		switch (type) {
 			case TYPE_URIC_ACID -> applyUricAcidSnapshot(userId, recordId, snapshot);
 			case TYPE_WEIGHT -> applyWeightSnapshot(userId, recordId, snapshot);
-			case TYPE_BLOOD_PRESSURE -> applyBloodPressureSnapshot(userId, recordId, snapshot);
 			case TYPE_HYDRATION -> applyHydrationSnapshot(userId, recordId, snapshot);
 			case TYPE_FLARE -> applyFlareSnapshot(userId, recordId, snapshot);
 			default -> throw unsupportedType(type);
@@ -710,25 +621,6 @@ public class RecordCenterService {
 		entity.setSourceName(snapshot.source());
 		entity.setNoteText(snapshot.note());
 		weightRecordRepository.save(entity);
-	}
-
-	private void applyBloodPressureSnapshot(
-			String userId,
-			String recordId,
-			AppContracts.HealthRecordDetailResponse snapshot
-	) {
-		BloodPressureRecordEntity entity = bloodPressureRecordRepository.findByRecordCode(recordId)
-				.orElseGet(BloodPressureRecordEntity::new);
-		entity.setRecordCode(recordId);
-		entity.setUserCode(userId);
-		entity.setSystolicPressure(parseRequiredIntegerField(snapshot, "systolicPressure", "收缩压快照缺失"));
-		entity.setDiastolicPressure(parseRequiredIntegerField(snapshot, "diastolicPressure", "舒张压快照缺失"));
-		entity.setUnit(parseRequiredField(snapshot, "unit", "血压单位快照缺失"));
-		entity.setMeasuredAt(snapshot.occurredAt());
-		entity.setSourceName(snapshot.source());
-		entity.setNoteText(snapshot.note());
-		entity.setPulseRate(parseOptionalIntegerField(snapshot, "pulseRate"));
-		bloodPressureRecordRepository.save(entity);
 	}
 
 	private void applyHydrationSnapshot(String userId, String recordId, AppContracts.HealthRecordDetailResponse snapshot) {
@@ -771,15 +663,6 @@ public class RecordCenterService {
 				userId,
 				recordId,
 				WeightRecordEntity::getUserCode
-		);
-	}
-
-	private BloodPressureRecordEntity requireOwnedBloodPressure(String userId, String recordId) {
-		return requireOwned(
-				bloodPressureRecordRepository.findByRecordCode(recordId),
-				userId,
-				recordId,
-				BloodPressureRecordEntity::getUserCode
 		);
 	}
 
@@ -987,18 +870,6 @@ public class RecordCenterService {
 		}
 	}
 
-	private Integer parseOptionalIntegerField(AppContracts.HealthRecordDetailResponse snapshot, String key) {
-		String value = parseOptionalField(snapshot, key);
-		if (!StringUtils.hasText(value)) {
-			return null;
-		}
-		try {
-			return Integer.parseInt(value.trim());
-		} catch (NumberFormatException ex) {
-			throw new BusinessException("RECORD_RESTORE_UNSUPPORTED", "审计快照字段无法恢复: " + key);
-		}
-	}
-
 	private Integer parseIntegerWithSuffix(
 			AppContracts.HealthRecordDetailResponse snapshot,
 			String key,
@@ -1112,19 +983,6 @@ public class RecordCenterService {
 			return AppContracts.RiskLevel.GREEN;
 		}
 		return painLevel >= 8 ? AppContracts.RiskLevel.RED : AppContracts.RiskLevel.YELLOW;
-	}
-
-	private AppContracts.RiskLevel bloodPressureRisk(Integer systolicPressure, Integer diastolicPressure) {
-		if (systolicPressure == null || diastolicPressure == null) {
-			return AppContracts.RiskLevel.GREEN;
-		}
-		if (systolicPressure >= 160 || diastolicPressure >= 100) {
-			return AppContracts.RiskLevel.RED;
-		}
-		if (systolicPressure >= 140 || diastolicPressure >= 90) {
-			return AppContracts.RiskLevel.YELLOW;
-		}
-		return AppContracts.RiskLevel.GREEN;
 	}
 
 	@FunctionalInterface

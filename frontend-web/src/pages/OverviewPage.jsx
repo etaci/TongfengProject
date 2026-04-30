@@ -7,6 +7,14 @@ import { SummaryList } from "../components/HealthBlocks";
 import { formatDateTime } from "../utils/format";
 
 export default function OverviewPage({ app, data, trendOptions }) {
+  const metricHighlights = [
+    ["活跃用户", data.mvpMetricsSummary?.activeUsers ?? "-"],
+    ["总事件数", data.mvpMetricsSummary?.totalEvents ?? "-"],
+    ["尿酸记录用户", data.mvpMetricsSummary?.uricAcidRecordUsers ?? "-"],
+    ["家庭协同用户", (data.mvpMetricsSummary?.familyInviteUsers || 0) + (data.mvpMetricsSummary?.familySummaryUsers || 0)],
+  ];
+  const metricBreakdown = (data.mvpMetricsSummary?.eventBreakdown || []).filter((item) => item.totalEvents > 0);
+
   return (
     <section className="content-section" id="overview">
       <SectionHeader
@@ -120,6 +128,50 @@ export default function OverviewPage({ app, data, trendOptions }) {
           </div>
         </Card>
       </div>
+
+      <Card>
+        <div className="card-head">
+          <div>
+            <p className="eyebrow">MVP validation</p>
+            <h3>近 {data.mvpMetricsSummary?.days || 7} 天功能使用概览</h3>
+          </div>
+          <span className="inline-tag">
+            {data.mvpMetricsSummary?.generatedAt ? `更新于 ${formatDateTime(data.mvpMetricsSummary.generatedAt)}` : "等待同步"}
+          </span>
+        </div>
+        {data.mvpMetricsSummary ? (
+          <>
+            <div className="stats-grid">
+              {metricHighlights.map(([label, value]) => (
+                <div className="stat-line" key={label}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="stack-list">
+              {metricBreakdown.length ? (
+                metricBreakdown.map((item) => (
+                  <article className="list-card" key={item.eventType}>
+                    <div className="result-header">
+                      <strong>{item.label}</strong>
+                      <span>{item.totalEvents} 次事件 / {item.uniqueUsers} 位用户</span>
+                    </div>
+                    <div className="list-card__meta">
+                      <span>{item.eventType}</span>
+                      <span>{item.latestEventAt ? formatDateTime(item.latestEventAt) : "暂无时间"}</span>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <EmptyState message="近 7 天还没有形成可统计的 MVP 使用事件。" />
+              )}
+            </div>
+          </>
+        ) : (
+          <EmptyState message="指标汇总正在加载，登录并同步后会展示近 7 天使用情况。" />
+        )}
+      </Card>
     </section>
   );
 }

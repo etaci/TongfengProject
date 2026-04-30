@@ -45,6 +45,25 @@ Authorization: Bearer {token}
 - `tokenType`
 - `expiresAt`
 
+### 应用能力
+
+- `GET /api/v1/app/capabilities`
+
+返回数据字段：
+
+- `features`
+
+单个 `feature` 字段：
+
+- `featureKey`
+- `displayName`
+- `enabled`
+- `note`
+
+说明：
+
+- 当前仅保留 `family-care` 能力状态，用于前端决定是否展示家属协同入口
+
 ### 用户档案
 
 - `GET /api/v1/profile`
@@ -93,39 +112,161 @@ Authorization: Bearer {token}
 ### 指标记录
 
 - `POST /api/v1/records/uric-acid`
+- `GET /api/v1/records/uric-acid`
 - `POST /api/v1/records/weight`
-- `POST /api/v1/records/blood-pressure`
-- `GET /api/v1/records/blood-pressure`
+- `GET /api/v1/records/weight`
 - `POST /api/v1/records/flares`
+- `GET /api/v1/records/flares`
 - `POST /api/v1/records/hydration`
+- `GET /api/v1/records/hydration`
 - `GET /api/v1/records/timeline`
+- `GET /api/v1/records/center`
+- `GET /api/v1/records/detail`
+- `PUT /api/v1/records/detail`
+- `DELETE /api/v1/records/detail`
+- `GET /api/v1/records/audits`
+- `POST /api/v1/records/restore`
 
 说明：
 
-- 上述五个记录写入接口都会返回 `recordId + createdAt + message`
+- 上述四个记录写入接口都会返回 `recordId + createdAt + message`
 - 时间字段为空时，后端会自动使用当前时间
+- 记录中心当前只支持 `URIC_ACID / WEIGHT / HYDRATION / FLARE`
 
-`POST /api/v1/records/blood-pressure` 请求体字段：
+`GET /api/v1/records/center` 查询参数：
 
-- `systolicPressure`
-- `diastolicPressure`
-- `pulseRate`
-- `unit`
-- `measuredAt`
-- `source`
-- `note`
+- `types`，可选，多值筛选
+- `cursor`，可选，基于发生时间的游标
+- `limit`，可选，默认 `20`，范围 `1-100`
 
-`GET /api/v1/records/blood-pressure` 返回字段：
+`GET /api/v1/records/center` 返回数据字段：
+
+- `types`
+- `totalCount`
+- `returnedCount`
+- `limit`
+- `items`
+- `nextCursor`
+- `hasMore`
+
+单个 `item` 字段：
 
 - `recordId`
-- `systolicPressure`
-- `diastolicPressure`
-- `pulseRate`
+- `type`
+- `title`
+- `summary`
+- `occurredAt`
+- `riskLevel`
+- `source`
+- `tags`
+
+`GET /api/v1/records/detail` 查询参数：
+
+- `type`
+- `recordId`
+
+`GET /api/v1/records/detail` 返回数据字段：
+
+- `recordId`
+- `type`
+- `title`
+- `summary`
+- `occurredAt`
+- `riskLevel`
+- `source`
+- `note`
+- `tags`
+- `fields`
+
+单个 `field` 字段：
+
+- `key`
+- `label`
+- `value`
+
+`PUT /api/v1/records/detail` 查询参数：
+
+- `type`
+- `recordId`
+
+`PUT /api/v1/records/detail` 请求体字段：
+
+- `value`
+- `decimalValue`
 - `unit`
 - `measuredAt`
 - `source`
+- `waterIntakeMl`
+- `urineColorLevel`
+- `checkedAt`
+- `joint`
+- `painLevel`
+- `startedAt`
+- `durationNote`
 - `note`
-- `riskLevel`
+- `changeReason`
+
+说明：
+
+- 不同记录类型只会消费对应字段，例如 `URIC_ACID` 使用 `value + unit + measuredAt`
+- `changeReason` 必填，用于审计留痕
+
+`DELETE /api/v1/records/detail` 查询参数：
+
+- `type`
+- `recordId`
+
+返回数据字段：
+
+- `recordId`
+- `type`
+- `status`
+- `deletedAt`
+- `message`
+
+`GET /api/v1/records/audits` 查询参数：
+
+- `type`
+- `recordId`
+- `limit`，可选，默认 `20`，范围 `1-50`
+
+返回数据字段：
+
+- `auditId`
+- `recordId`
+- `type`
+- `action`
+- `changeReason`
+- `summary`
+- `operatedAt`
+- `fields`
+
+单个审计 `field` 字段：
+
+- `key`
+- `label`
+- `beforeValue`
+- `afterValue`
+
+`POST /api/v1/records/restore` 查询参数：
+
+- `type`
+- `recordId`
+- `auditId`
+
+请求体字段：
+
+- `changeReason`
+
+返回数据字段：
+
+- `recordId`
+- `type`
+- `restoredFromAuditId`
+- `status`
+- `restoredAt`
+- `message`
+- `detail`
 
 ### 首页主动管理
 
@@ -399,218 +540,7 @@ Authorization: Bearer {token}
 - 只有已建立有效授权绑定的家属才能查看指定患者摘要
 - 当前摘要默认聚合患者的提醒、主动管理结果、最近一次尿酸和最近一次发作信息
 
-## 5. 设备接入与同步接口
-
-### 设备绑定
-
-- `POST /api/v1/devices`
-- `GET /api/v1/devices`
-- `DELETE /api/v1/devices/{deviceCode}`
-
-创建设备请求体示例：
-
-```json
-{
-  "deviceType": "URIC_ACID_METER",
-  "vendorName": "Tongfeng",
-  "deviceModel": "UA-1",
-  "serialNumber": "UA-SN-001",
-  "aliasName": "家用尿酸仪"
-}
-```
-
-当前推荐设备类型：
-
-- `URIC_ACID_METER`
-- `SMART_WATER_CUP`
-
-### 设备同步
-
-- `POST /api/v1/devices/{deviceCode}/sync`
-- `GET /api/v1/devices/{deviceCode}/sync-events`
-
-批量同步请求体示例：
-
-```json
-{
-  "items": [
-    {
-      "metricType": "URIC_ACID",
-      "externalEventId": "evt-ua-1",
-      "measuredAt": "2026-04-29T08:00:00Z",
-      "value": 502,
-      "unit": "μmol/L",
-      "note": "device sync"
-    },
-    {
-      "metricType": "HYDRATION",
-      "externalEventId": "evt-hyd-1",
-      "measuredAt": "2026-04-29T09:00:00Z",
-      "waterIntakeMl": 900,
-      "urineColorLevel": 4,
-      "note": "smart cup sync"
-    }
-  ]
-}
-```
-
-当前支持的同步指标：
-
-- `URIC_ACID`
-- `HYDRATION`
-- `WEIGHT`
-- `BLOOD_PRESSURE`
-
-说明：
-
-- `externalEventId` 在同一设备下会做去重
-- 同步成功后会自动写入正式健康记录
-- 同步完成后会刷新当日日汇总和提醒规则
-
-血压同步字段补充：
-
-- `systolicPressure`
-- `diastolicPressure`
-- `pulseRate`
-- `unit`
-
-## 6. 积分成长接口
-
-### 成长总览
-
-- `GET /api/v1/growth/overview`
-
-返回数据字段：
-
-- `userId`
-- `level`
-- `levelTitle`
-- `totalPoints`
-- `redeemablePoints`
-- `currentLevelMinPoints`
-- `nextLevelPoints`
-- `currentStreakDays`
-- `longestStreakDays`
-- `todayPoints`
-- `badgesCount`
-- `highlights`
-
-### 今日任务
-
-- `GET /api/v1/growth/tasks`
-
-单个任务字段：
-
-- `taskCode`
-- `title`
-- `description`
-- `rewardPoints`
-- `completedCount`
-- `targetCount`
-- `completed`
-
-### 周目标与成长挑战
-
-- `GET /api/v1/growth/weekly-plan`
-
-返回数据字段：
-
-- `weekStartDate`
-- `weekEndDate`
-- `weeklyEarnedPoints`
-- `targetPoints`
-- `progressPercent`
-- `challenges`
-
-单个 `challenge` 字段：
-
-- `challengeCode`
-- `category`
-- `title`
-- `description`
-- `rewardPoints`
-- `completedCount`
-- `targetCount`
-- `priority`
-- `completed`
-- `hints`
-
-说明：
-
-- 当前挑战会混合返回 `WEEKLY / RISK / FAMILY` 三类任务
-- `RISK` 类任务会根据当前提醒自动生成
-- `FAMILY` 类任务会根据家属绑定状态自动变化
-
-### 积分流水
-
-- `GET /api/v1/growth/points?limit=20`
-
-说明：
-
-- `limit` 取值范围：`1-50`
-- 当前会返回最近积分流水，默认按创建时间倒序
-
-单条流水字段：
-
-- `pointId`
-- `actionType`
-- `points`
-- `summary`
-- `awardedDate`
-- `createdAt`
-
-### 徽章列表
-
-- `GET /api/v1/growth/badges`
-
-单个徽章字段：
-
-- `badgeKey`
-- `badgeName`
-- `badgeDescription`
-- `awardedAt`
-
-说明：
-
-- 当前积分会自动挂接到尿酸、体重、发作、补水、设备接入、家属绑定、知识问答、用药计划、主动管理设置等关键行为
-- 当前内置徽章覆盖首个健康动作、首条尿酸记录、设备接入、家属协同、补水坚持与连续活跃等场景
-
-### 奖励中心
-
-- `GET /api/v1/growth/rewards`
-- `POST /api/v1/growth/rewards/{rewardKey}/claim`
-- `GET /api/v1/growth/reward-claims`
-
-奖励列表字段：
-
-- `rewardKey`
-- `rewardName`
-- `rewardDescription`
-- `rewardType`
-- `pointsCost`
-- `remainingClaims`
-- `claimable`
-- `claimHint`
-
-领取结果字段：
-
-- `claimCode`
-- `rewardKey`
-- `rewardName`
-- `rewardType`
-- `pointsCost`
-- `remainingPoints`
-- `status`
-- `claimNote`
-- `claimedAt`
-
-说明：
-
-- 奖励兑换消耗的是 `redeemablePoints`，不会回退用户历史总积分与等级
-- 当前奖励采用按用户限次领取策略
-- `reward-claims` 返回当前用户的奖励领取历史
-
-## 7. 调度与规则说明
+## 5. 调度与规则说明
 
 - 默认开启主动管理调度：`app.scheduler-enabled=true`
 - 提醒刷新 cron：`app.reminder-refresh-cron=0 0/30 * * * *`
@@ -629,7 +559,7 @@ Authorization: Bearer {token}
 - 天气能力默认按 Open-Meteo 官方接口拉取
 - 若天气接口不可用，后端会回退到保底天气模型，不影响主动管理接口返回
 
-## 8. AI 子服务内部接口
+## 6. AI 子服务内部接口
 
 - `POST /api/v1/vision/meal-analyze`
   - Java 内部调用的餐盘识别接口
@@ -644,15 +574,14 @@ Authorization: Bearer {token}
 - Java 主服务已经把这些能力封装成统一业务接口
 - 若知识问答 AI 子服务暂不可用，Java 主服务会自动返回本地兜底建议，避免接口直接报错
 
-## 9. 前端建议接入顺序
+## 7. 前端建议接入顺序
 
 1. 登录拿 token。
-2. 完成用户档案页。
-3. 接饮食拍照识别、尿酸/体重/发作/饮水打卡。
-4. 首页接 `overview + trends + reminders + daily-summaries`。
-5. 再接化验单、问答、画像、用药。
-6. 如进入 V3 页面，再接 `proactive-care/settings`、`proactive-care/brief` 和 `flares/reports/latest`。
-7. 如进入家属协同页，再接 `family/invitations`、`family/members`、`family/alerts` 和 `family/patients/{patientUserId}/summary`。
-8. 如进入设备接入页，再接 `devices`、`devices/{deviceCode}/sync` 和 `devices/{deviceCode}/sync-events`。
-9. 如进入成长激励页，再接 `growth/overview`、`growth/tasks`、`growth/points` 和 `growth/badges`。
-10. 如进入成长运营页，再接 `growth/weekly-plan`、`growth/rewards`、`growth/rewards/{rewardKey}/claim` 和 `growth/reward-claims`。
+2. 登录后先拉 `app/capabilities`，确定家属协同入口是否开放。
+3. 完成用户档案页。
+4. 接饮食拍照识别、尿酸/体重/发作/饮水打卡。
+5. 如需记录治理能力，再接 `records/center`、`records/detail`、`records/audits` 和 `records/restore`。
+6. 首页接 `overview + trends + reminders + daily-summaries`。
+7. 再接化验单、问答、画像、用药。
+8. 如进入 V3 页面，再接 `proactive-care/settings`、`proactive-care/brief` 和 `flares/reports/latest`。
+9. 如进入家属协同页，再接 `family/invitations`、`family/members`、`family/alerts` 和 `family/patients/{patientUserId}/summary`。

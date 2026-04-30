@@ -14,6 +14,7 @@ export function mockLogin(nickname) {
 
 export function getBootstrapData(session, days) {
   return Promise.all([
+    apiRequest("/api/v1/app/capabilities", {}, session),
     apiRequest("/api/v1/profile", {}, session),
     apiRequest("/api/v1/dashboard/overview", {}, session),
     apiRequest(`/api/v1/dashboard/trends?days=${days}`, {}, session),
@@ -23,7 +24,9 @@ export function getBootstrapData(session, days) {
     apiRequest("/api/v1/records/timeline", {}, session),
     apiRequest("/api/v1/lab-reports", {}, session),
     apiRequest("/api/v1/persona/summary", {}, session),
+    apiRequest("/api/v1/analysis/uric-acid-causes?lookbackDays=7", {}, session),
     apiRequest("/api/v1/medications", {}, session),
+    apiRequest("/api/v1/mvp/metrics/summary?days=7", {}, session),
   ]);
 }
 
@@ -33,30 +36,24 @@ export function getRecordSnapshots(session) {
     apiRequest("/api/v1/records/weight", {}, session),
     apiRequest("/api/v1/records/hydration", {}, session),
     apiRequest("/api/v1/records/flares", {}, session),
-    apiRequest("/api/v1/records/blood-pressure", {}, session),
   ]);
 }
 
-export async function getExtendedData(session) {
+export async function getExtendedData(session, { familyEnabled = false } = {}) {
   const requestEntries = [
     ["proactiveSettings", () => apiRequest("/api/v1/proactive-care/settings", {}, session)],
     ["proactiveBrief", () => apiRequest("/api/v1/proactive-care/brief", {}, session)],
     ["flareReview", () => apiRequest("/api/v1/flares/reports/latest", {}, session)],
     ["recordCenter", () => apiRequest("/api/v1/records/center?limit=20", {}, session)],
-    ["familyInvites", () => apiRequest("/api/v1/family/invitations", {}, session)],
-    ["familyMembers", () => apiRequest("/api/v1/family/members", {}, session)],
-    ["familyAlerts", () => apiRequest("/api/v1/family/alerts", {}, session)],
-    ["devices", () => apiRequest("/api/v1/devices", {}, session)],
-    ["deviceCatalog", () => apiRequest("/api/v1/devices/catalog", {}, session)],
-    ["deviceOverview", () => apiRequest("/api/v1/devices/overview", {}, session)],
-    ["growthOverview", () => apiRequest("/api/v1/growth/overview", {}, session)],
-    ["growthTasks", () => apiRequest("/api/v1/growth/tasks", {}, session)],
-    ["growthWeeklyPlan", () => apiRequest("/api/v1/growth/weekly-plan", {}, session)],
-    ["growthRewards", () => apiRequest("/api/v1/growth/rewards", {}, session)],
-    ["growthRewardClaims", () => apiRequest("/api/v1/growth/reward-claims", {}, session)],
-    ["growthPoints", () => apiRequest("/api/v1/growth/points?limit=10", {}, session)],
-    ["growthBadges", () => apiRequest("/api/v1/growth/badges", {}, session)],
   ];
+
+  if (familyEnabled) {
+    requestEntries.push(
+      ["familyInvites", () => apiRequest("/api/v1/family/invitations", {}, session)],
+      ["familyMembers", () => apiRequest("/api/v1/family/members", {}, session)],
+      ["familyAlerts", () => apiRequest("/api/v1/family/alerts", {}, session)],
+    );
+  }
 
   const results = await Promise.allSettled(requestEntries.map((entry) => entry[1]()));
 
@@ -73,7 +70,7 @@ export async function getExtendedData(session) {
       return accumulator;
     }
 
-    if (["familyInvites", "familyAlerts", "devices", "deviceCatalog", "growthTasks", "growthRewards", "growthRewardClaims", "growthPoints", "growthBadges"].includes(name)) {
+    if (["familyInvites", "familyAlerts"].includes(name)) {
       accumulator[name] = [];
       return accumulator;
     }
@@ -93,11 +90,26 @@ export async function getExtendedData(session) {
 
     accumulator[name] = null;
     return accumulator;
-  }, {});
+  }, {
+    familyInvites: [],
+    familyMembers: { asPatient: [], asCaregiver: [] },
+    familyAlerts: [],
+    devices: [],
+    deviceCatalog: [],
+    deviceOverview: null,
+    growthOverview: null,
+    growthTasks: [],
+    growthPoints: [],
+    growthBadges: [],
+    growthWeeklyPlan: null,
+    growthRewards: [],
+    growthRewardClaims: [],
+  });
 }
 
 export function getDashboardBundle(session, days) {
   return Promise.all([
+    apiRequest("/api/v1/app/capabilities", {}, session),
     apiRequest("/api/v1/dashboard/overview", {}, session),
     apiRequest(`/api/v1/dashboard/trends?days=${days}`, {}, session),
     apiRequest(`/api/v1/dashboard/daily-summaries?days=${days}`, {}, session),
@@ -106,7 +118,17 @@ export function getDashboardBundle(session, days) {
     apiRequest("/api/v1/records/timeline", {}, session),
     apiRequest("/api/v1/lab-reports", {}, session),
     apiRequest("/api/v1/persona/summary", {}, session),
+    apiRequest("/api/v1/analysis/uric-acid-causes?lookbackDays=7", {}, session),
+    apiRequest("/api/v1/mvp/metrics/summary?days=7", {}, session),
   ]);
+}
+
+export function getUricAcidCauseAnalysis(session, lookbackDays = 7) {
+  return apiRequest(`/api/v1/analysis/uric-acid-causes?lookbackDays=${lookbackDays}`, {}, session);
+}
+
+export function getMvpMetricsSummary(session, days = 7) {
+  return apiRequest(`/api/v1/mvp/metrics/summary?days=${days}`, {}, session);
 }
 
 export function updateProfile(session, payload) {

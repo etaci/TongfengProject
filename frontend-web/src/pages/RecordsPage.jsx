@@ -169,35 +169,40 @@ export default function RecordsPage({
           <Card>
             <div className="card-head">
               <div>
-                <p className="eyebrow">Quick record</p>
-                <h3>血压记录</h3>
+                <p className="eyebrow">Record strategy</p>
+                <h3>记录节奏建议</h3>
               </div>
             </div>
-            <form
-              className="stack-form compact-form"
-              onSubmit={(event) =>
-                handleRecordSubmit(event, "bloodPressure", "/api/v1/records/blood-pressure", "血压记录已提交。", (formData) => ({
-                  systolicPressure: Number(formData.get("systolicPressure")),
-                  diastolicPressure: Number(formData.get("diastolicPressure")),
-                  pulseRate: formData.get("pulseRate") ? Number(formData.get("pulseRate")) : null,
-                  unit: emptyToNull(formData.get("unit")) || "mmHg",
-                  measuredAt: toIsoString(emptyToNull(formData.get("measuredAt"))),
-                  source: emptyToNull(formData.get("source")),
-                  note: emptyToNull(formData.get("note")),
-                }))
-              }
-            >
-              <RecordInput name="systolicPressure" label="收缩压" type="number" min="60" max="260" placeholder="例如：126" required />
-              <RecordInput name="diastolicPressure" label="舒张压" type="number" min="40" max="180" placeholder="例如：82" required />
-              <RecordInput name="pulseRate" label="脉搏" type="number" min="30" max="240" placeholder="例如：75" />
-              <RecordInput name="unit" label="单位" defaultValue="mmHg" />
-              <RecordInput name="measuredAt" label="测量时间" type="datetime-local" />
-              <RecordInput name="source" label="来源" placeholder="例如：家庭血压计" />
-              <RecordTextarea name="note" label="备注" placeholder="补充症状或测量状态" />
-              <button className="primary-button" type="submit" disabled={!session || busyMap.bloodPressure}>
-                {busyMap.bloodPressure ? "提交中..." : "提交血压记录"}
-              </button>
-            </form>
+            <div className={`result-panel ${data.uricAcidCauseAnalysis ? "" : "empty-panel"}`}>
+              {data.uricAcidCauseAnalysis ? (
+                <>
+                  <div className="result-header">
+                    <div>
+                      <h4>最近尿酸波动分析</h4>
+                      <p>{data.uricAcidCauseAnalysis.summary}</p>
+                    </div>
+                    <RiskBadge level={data.uricAcidCauseAnalysis.overallRiskLevel} />
+                  </div>
+                  <div className="token-list">
+                    {(data.uricAcidCauseAnalysis.factors || []).slice(0, 3).map((factor) => (
+                      <div className="token" key={factor.code}>
+                        <strong>{factor.title}</strong>
+                        <p className="meta-text">{factor.evidence}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="stack-list">
+                    {(data.uricAcidCauseAnalysis.nextActions || []).slice(0, 3).map((item) => (
+                      <div className="list-card" key={item}>
+                        <p>{item}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                "登录并补充尿酸、饮食和饮水记录后，这里会给出当前阶段最值得优先记录和复盘的方向。"
+              )}
+            </div>
           </Card>
         </div>
 
@@ -219,16 +224,6 @@ export default function RecordsPage({
               title: `${item.value} ${item.unit || "kg"}`,
               summary: item.note || "暂无备注",
               metaLeft: item.source || "无来源说明",
-              metaRight: formatDateTime(item.measuredAt),
-            })}
-          />
-          <RecentRecordPanel
-            title="最近血压"
-            items={data.recordSnapshots?.bloodPressure}
-            renderMeta={(item) => ({
-              title: `${item.systolicPressure}/${item.diastolicPressure} ${item.unit || "mmHg"}`,
-              summary: item.note || "暂无备注",
-              metaLeft: item.pulseRate ? `脉搏 ${item.pulseRate}` : "无脉搏数据",
               metaRight: formatDateTime(item.measuredAt),
             })}
           />

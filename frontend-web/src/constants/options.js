@@ -54,5 +54,4 @@ export const recordTypeOptions = [
   { label: "体重", value: "WEIGHT" },
   { label: "饮水", value: "HYDRATION" },
   { label: "发作", value: "FLARE" },
-  { label: "血压", value: "BLOOD_PRESSURE" },
 ];

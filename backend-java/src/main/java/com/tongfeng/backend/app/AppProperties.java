@@ -16,6 +16,7 @@ public class AppProperties {
 	private boolean weatherLiveEnabled = true;
 	private String weatherGeocodingBaseUrl = "https://geocoding-api.open-meteo.com";
 	private String weatherForecastBaseUrl = "https://api.open-meteo.com";
+	private boolean familyEnabled = true;
 
 	public String getAiBaseUrl() {
 		return aiBaseUrl;
@@ -103,5 +104,13 @@ public class AppProperties {
 
 	public void setWeatherForecastBaseUrl(String weatherForecastBaseUrl) {
 		this.weatherForecastBaseUrl = weatherForecastBaseUrl;
+	}
+
+	public boolean isFamilyEnabled() {
+		return familyEnabled;
+	}
+
+	public void setFamilyEnabled(boolean familyEnabled) {
+		this.familyEnabled = familyEnabled;
 	}
 }

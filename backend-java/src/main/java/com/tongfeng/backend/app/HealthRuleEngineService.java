@@ -1,7 +1,6 @@
 package com.tongfeng.backend.app;
 
 import com.tongfeng.backend.app.persistence.entity.DailyHealthSummaryEntity;
-import com.tongfeng.backend.app.persistence.entity.BloodPressureRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.FlareRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.HydrationRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.LabReportRecordEntity;
@@ -12,7 +11,6 @@ import com.tongfeng.backend.app.persistence.entity.UricAcidRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.WeatherDailySnapshotEntity;
 import com.tongfeng.backend.app.persistence.entity.WeightRecordEntity;
 import com.tongfeng.backend.app.persistence.repo.DailyHealthSummaryRepository;
-import com.tongfeng.backend.app.persistence.repo.BloodPressureRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.FlareRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.HydrationRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.LabReportRecordRepository;
@@ -44,7 +42,6 @@ public class HealthRuleEngineService {
 	private final DailyHealthSummaryRepository dailyHealthSummaryRepository;
 	private final UricAcidRecordRepository uricAcidRecordRepository;
 	private final WeightRecordRepository weightRecordRepository;
-	private final BloodPressureRecordRepository bloodPressureRecordRepository;
 	private final FlareRecordRepository flareRecordRepository;
 	private final HydrationRecordRepository hydrationRecordRepository;
 	private final MealRecordRepository mealRecordRepository;
@@ -58,7 +55,6 @@ public class HealthRuleEngineService {
 			DailyHealthSummaryRepository dailyHealthSummaryRepository,
 			UricAcidRecordRepository uricAcidRecordRepository,
 			WeightRecordRepository weightRecordRepository,
-			BloodPressureRecordRepository bloodPressureRecordRepository,
 			FlareRecordRepository flareRecordRepository,
 			HydrationRecordRepository hydrationRecordRepository,
 			MealRecordRepository mealRecordRepository,
@@ -71,7 +67,6 @@ public class HealthRuleEngineService {
 		this.dailyHealthSummaryRepository = dailyHealthSummaryRepository;
 		this.uricAcidRecordRepository = uricAcidRecordRepository;
 		this.weightRecordRepository = weightRecordRepository;
-		this.bloodPressureRecordRepository = bloodPressureRecordRepository;
 		this.flareRecordRepository = flareRecordRepository;
 		this.hydrationRecordRepository = hydrationRecordRepository;
 		this.mealRecordRepository = mealRecordRepository;
@@ -208,7 +203,6 @@ public class HealthRuleEngineService {
 	private List<AppContracts.ReminderResponse> buildReminderResponses(String userId, Instant now) {
 		List<AppContracts.ReminderResponse> reminders = new ArrayList<>();
 		List<UricAcidRecordEntity> uaRecords = uricAcidRecordRepository.findByUserCodeOrderByMeasuredAtDesc(userId);
-		List<BloodPressureRecordEntity> bloodPressureRecords = bloodPressureRecordRepository.findByUserCodeOrderByMeasuredAtDesc(userId);
 		List<MealRecordEntity> mealRecords = mealRecordRepository.findByUserCodeOrderByTakenAtDesc(userId);
 		List<HydrationRecordEntity> hydrationRecords = hydrationRecordRepository.findByUserCodeOrderByCheckedAtDesc(userId);
 		List<FlareRecordEntity> flareRecords = flareRecordRepository.findByUserCodeOrderByStartedAtDesc(userId);
@@ -242,24 +236,6 @@ public class HealthRuleEngineService {
 				} else if (delta >= 30) {
 					reminders.add(reminder("TREND", "尿酸趋势波动偏大", "最近几次尿酸记录有上升趋势，建议加强连续记录并关注诱因。", AppContracts.RiskLevel.YELLOW, now));
 				}
-			}
-		}
-
-		Optional<BloodPressureRecordEntity> latestBloodPressure = bloodPressureRecords.stream().findFirst();
-		if (latestBloodPressure.isPresent()) {
-			BloodPressureRecordEntity record = latestBloodPressure.get();
-			AppContracts.RiskLevel bpRisk = bloodPressureRisk(record.getSystolicPressure(), record.getDiastolicPressure());
-			if (bpRisk != AppContracts.RiskLevel.GREEN) {
-				reminders.add(reminder(
-						"BLOOD_PRESSURE",
-						"血压记录需要关注",
-						"最近一次血压为 " + record.getSystolicPressure() + "/" + record.getDiastolicPressure()
-								+ " " + record.getUnit()
-								+ (record.getPulseRate() == null ? "" : "，脉搏 " + record.getPulseRate())
-								+ "，建议结合近期作息、饮食与复测持续观察。",
-						bpRisk,
-						record.getMeasuredAt()
-				));
 			}
 		}
 
@@ -360,19 +336,6 @@ public class HealthRuleEngineService {
 			return AppContracts.RiskLevel.RED;
 		}
 		if (value > 420) {
-			return AppContracts.RiskLevel.YELLOW;
-		}
-		return AppContracts.RiskLevel.GREEN;
-	}
-
-	private AppContracts.RiskLevel bloodPressureRisk(Integer systolicPressure, Integer diastolicPressure) {
-		if (systolicPressure == null || diastolicPressure == null) {
-			return AppContracts.RiskLevel.GREEN;
-		}
-		if (systolicPressure >= 160 || diastolicPressure >= 100) {
-			return AppContracts.RiskLevel.RED;
-		}
-		if (systolicPressure >= 140 || diastolicPressure >= 90) {
 			return AppContracts.RiskLevel.YELLOW;
 		}
 		return AppContracts.RiskLevel.GREEN;
