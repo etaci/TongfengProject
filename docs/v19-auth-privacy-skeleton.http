@@ -1,0 +1,85 @@
+@baseUrl = http://localhost:8080
+@account = v19-user@example.com
+@password = Tongfeng123
+
+### 注册正式账号
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "nickname": "真实登录用户",
+  "accountType": "EMAIL",
+  "account": "{{account}}",
+  "password": "{{password}}",
+  "confirmPassword": "{{password}}",
+  "consent": {
+    "consentVersion": "v1.0",
+    "privacyPolicyVersion": "privacy-v1.0",
+    "privacyAccepted": true,
+    "termsAccepted": true,
+    "medicalDataAuthorized": true,
+    "familyCollaborationAuthorized": false,
+    "notificationAuthorized": true
+  }
+}
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 查看当前会话
+GET {{baseUrl}}/api/v1/auth/session
+Authorization: Bearer {{token}}
+
+### 查看当前隐私授权
+GET {{baseUrl}}/api/v1/privacy/consents/current
+Authorization: Bearer {{token}}
+
+### 更新隐私授权
+PUT {{baseUrl}}/api/v1/privacy/consents/current
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "consentVersion": "v1.1",
+  "privacyPolicyVersion": "privacy-v1.1",
+  "privacyAccepted": true,
+  "termsAccepted": true,
+  "medicalDataAuthorized": true,
+  "familyCollaborationAuthorized": true,
+  "notificationAuthorized": false
+}
+
+### 查看隐私授权历史
+GET {{baseUrl}}/api/v1/privacy/consents/history
+Authorization: Bearer {{token}}
+
+### 注销当前会话
+POST {{baseUrl}}/api/v1/auth/logout
+Authorization: Bearer {{token}}
+
+### 使用旧 token 再访问，预期失败
+GET {{baseUrl}}/api/v1/auth/session
+Authorization: Bearer {{token}}
+
+### 再次登录正式账号
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "accountType": "EMAIL",
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 开发联调入口仍保留
+POST {{baseUrl}}/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "mock-v19"
+}

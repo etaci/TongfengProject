@@ -1,0 +1,66 @@
+### 演示登录
+POST http://localhost:8080/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "v14-demo"
+}
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 更新用药计划
+PUT http://localhost:8080/api/v1/medications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "currentMedications": [
+    {
+      "name": "allopurinol",
+      "dosage": "100mg",
+      "frequency": "once-daily",
+      "remark": "after breakfast"
+    },
+    {
+      "name": "colchicine",
+      "dosage": "0.5mg",
+      "frequency": "twice-daily",
+      "remark": "short-term flare prevention"
+    }
+  ],
+  "followUpNote": "bring adherence summary to next follow-up"
+}
+
+### 查看依从摘要
+GET http://localhost:8080/api/v1/medications/adherence?days=7
+Authorization: Bearer {{token}}
+
+### 提交已服用打卡
+POST http://localhost:8080/api/v1/medications/check-ins
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "medicationName": "allopurinol",
+  "scheduledPeriod": "MORNING",
+  "status": "TAKEN",
+  "note": "after breakfast"
+}
+
+### 提交漏服打卡
+POST http://localhost:8080/api/v1/medications/check-ins
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "medicationName": "colchicine",
+  "scheduledPeriod": "EVENING",
+  "status": "MISSED",
+  "note": "forgot to carry medicine"
+}
+
+### 再查依从摘要
+GET http://localhost:8080/api/v1/medications/adherence?days=7
+Authorization: Bearer {{token}}

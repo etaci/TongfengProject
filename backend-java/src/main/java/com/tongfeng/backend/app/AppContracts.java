@@ -29,12 +29,134 @@ public final class AppContracts {
 	) {
 	}
 
+	public record PrivacyConsentSubmitRequest(
+			@NotBlank(message = "授权版本不能为空")
+			String consentVersion,
+			@NotBlank(message = "隐私政策版本不能为空")
+			String privacyPolicyVersion,
+			@NotNull(message = "请确认是否同意隐私政策")
+			Boolean privacyAccepted,
+			@NotNull(message = "请确认是否同意服务条款")
+			Boolean termsAccepted,
+			Boolean medicalDataAuthorized,
+			Boolean familyCollaborationAuthorized,
+			Boolean notificationAuthorized
+	) {
+	}
+
+	public record RegisterRequest(
+			@NotBlank(message = "昵称不能为空")
+			String nickname,
+			@NotBlank(message = "账号类型不能为空")
+			String accountType,
+			@NotBlank(message = "账号不能为空")
+			String account,
+			@NotBlank(message = "密码不能为空")
+			String password,
+			@NotBlank(message = "确认密码不能为空")
+			String confirmPassword,
+			@NotNull(message = "请先完成隐私授权")
+			@Valid
+			PrivacyConsentSubmitRequest consent
+	) {
+	}
+
+	public record LoginRequest(
+			@NotBlank(message = "账号类型不能为空")
+			String accountType,
+			@NotBlank(message = "账号不能为空")
+			String account,
+			@NotBlank(message = "密码不能为空")
+			String password
+	) {
+	}
+
+	public record ChangePasswordRequest(
+			@NotBlank(message = "当前密码不能为空")
+			String currentPassword,
+			@NotBlank(message = "新密码不能为空")
+			String newPassword,
+			@NotBlank(message = "确认密码不能为空")
+			String confirmPassword,
+			Boolean logoutOtherSessions
+	) {
+	}
+
 	public record AuthTokenResponse(
+			String sessionCode,
 			String userId,
 			String nickname,
+			String authMode,
+			String accountType,
+			String accountIdentifier,
+			boolean privacyConsentCompleted,
+			Instant createdAt,
+			Instant lastSeenAt,
 			String token,
 			String tokenType,
 			Instant expiresAt
+	) {
+	}
+
+	public record AuthSessionInfoResponse(
+			String sessionCode,
+			String userId,
+			String nickname,
+			String authMode,
+			String accountType,
+			String accountIdentifier,
+			boolean privacyConsentCompleted,
+			Instant createdAt,
+			Instant lastSeenAt,
+			Instant expiresAt
+	) {
+	}
+
+	public record AuthLogoutResponse(
+			Instant loggedOutAt,
+			String message
+	) {
+	}
+
+	public record AuthActiveSessionResponse(
+			String sessionCode,
+			String authMode,
+			String accountType,
+			String accountIdentifier,
+			boolean currentSession,
+			Instant createdAt,
+			Instant lastSeenAt,
+			Instant expiresAt
+	) {
+	}
+
+	public record PasswordChangeResponse(
+			Instant changedAt,
+			int loggedOutOtherSessions,
+			String message
+	) {
+	}
+
+	public record AuthSessionRevokeResponse(
+			String sessionCode,
+			Instant revokedAt,
+			String message
+	) {
+	}
+
+	public record PrivacyConsentResponse(
+			String consentCode,
+			String userId,
+			String consentVersion,
+			String privacyPolicyVersion,
+			boolean privacyAccepted,
+			boolean termsAccepted,
+			boolean medicalDataAuthorized,
+			boolean familyCollaborationAuthorized,
+			boolean notificationAuthorized,
+			String sourceType,
+			Instant effectiveAt,
+			Instant createdAt
 	) {
 	}
 
@@ -354,6 +476,30 @@ public final class AppContracts {
 	) {
 	}
 
+	public record TodayActionItemResponse(
+			String actionKey,
+			String category,
+			String title,
+			String description,
+			String priority,
+			String status
+	) {
+	}
+
+	public record TodayActionPlanResponse(
+			String userId,
+			RiskLevel overallRiskLevel,
+			String triageCode,
+			String triageTitle,
+			String triageSummary,
+			String nextStep,
+			List<String> reasons,
+			List<TodayActionItemResponse> actions,
+			List<String> trustNotes,
+			Instant generatedAt
+	) {
+	}
+
 	public record TrendPoint(
 			String date,
 			BigDecimal value,
@@ -449,6 +595,42 @@ public final class AppContracts {
 			RiskLevel overallRiskLevel,
 			List<String> suggestions,
 			String summary
+	) {
+	}
+
+	public record LabReportReviewComparisonResponse(
+			String code,
+			String name,
+			BigDecimal currentValue,
+			BigDecimal previousValue,
+			BigDecimal deltaValue,
+			String unit,
+			String referenceRange,
+			RiskLevel currentRiskLevel,
+			String trend,
+			String interpretation
+	) {
+	}
+
+	public record LabReportReviewResponse(
+			String reportId,
+			LocalDate reportDate,
+			RiskLevel overallRiskLevel,
+			String reviewSummary,
+			String comparedReportId,
+			LocalDate comparedReportDate,
+			Integer daysBetweenReports,
+			Integer targetUricAcidValue,
+			BigDecimal currentUricAcidValue,
+			String currentUricAcidUnit,
+			boolean uricAcidWithinTarget,
+			String targetConclusion,
+			List<LabReportReviewComparisonResponse> comparisons,
+			List<String> keyChanges,
+			String followUpRecommendation,
+			List<String> nextActions,
+			List<String> trustNotes,
+			Instant generatedAt
 	) {
 	}
 
@@ -550,7 +732,10 @@ public final class AppContracts {
 			String inviteMessage,
 			@Min(value = 1, message = "有效天数不能小于1")
 			@Max(value = 30, message = "有效天数不能大于30")
-			Integer expiresInDays
+			Integer expiresInDays,
+			String caregiverPermission,
+			Boolean weeklyReportEnabled,
+			Boolean notifyOnHighRisk
 	) {
 	}
 
@@ -562,6 +747,9 @@ public final class AppContracts {
 			String relationType,
 			String inviteMessage,
 			String status,
+			String caregiverPermission,
+			boolean weeklyReportEnabled,
+			boolean notifyOnHighRisk,
 			String acceptedByUserId,
 			String acceptedByNickname,
 			Instant expiresAt,
@@ -577,6 +765,9 @@ public final class AppContracts {
 			String caregiverNickname,
 			String relationType,
 			String status,
+			String caregiverPermission,
+			boolean weeklyReportEnabled,
+			boolean notifyOnHighRisk,
 			Instant createdAt
 	) {
 	}
@@ -597,6 +788,14 @@ public final class AppContracts {
 			String content,
 			String sourceType,
 			Instant generatedAt
+		) {
+	}
+
+	public record FamilyBindingPermissionUpdateRequest(
+			@NotBlank(message = "家属权限不能为空")
+			String caregiverPermission,
+			Boolean weeklyReportEnabled,
+			Boolean notifyOnHighRisk
 	) {
 	}
 
@@ -604,6 +803,8 @@ public final class AppContracts {
 			String patientUserId,
 			String patientNickname,
 			String relationType,
+			String caregiverPermission,
+			boolean weeklyReportEnabled,
 			RiskLevel overallRiskLevel,
 			String latestRiskSummary,
 			List<String> todayFocus,
@@ -617,6 +818,54 @@ public final class AppContracts {
 	) {
 	}
 
+	public record FamilySharedMedicationWeeklyReportResponse(
+			String patientUserId,
+			String patientNickname,
+			String relationType,
+			String caregiverPermission,
+			boolean weeklyReportEnabled,
+			MedicationWeeklyReportResponse weeklyReport,
+			Instant generatedAt
+	) {
+	}
+
+	public record FamilyTaskCreateRequest(
+			@NotBlank(message = "代办标题不能为空")
+			String title,
+			String description,
+			Instant dueAt
+	) {
+	}
+
+	public record FamilyTaskCompleteRequest(
+			String completionNote
+	) {
+	}
+
+	public record FamilyTaskResponse(
+			String taskCode,
+			String bindingCode,
+			String patientUserId,
+			String patientNickname,
+			String caregiverUserId,
+			String caregiverNickname,
+			String relationType,
+			String status,
+			String title,
+			String description,
+			Instant dueAt,
+			Instant createdAt,
+			Instant completedAt,
+			String completionNote
+	) {
+	}
+
+	public record FamilyTasksResponse(
+			List<FamilyTaskResponse> asPatient,
+			List<FamilyTaskResponse> asCaregiver
+	) {
+	}
+
 	public record MedicationItem(
 			@NotBlank(message = "药物名称不能为空")
 			String name,
@@ -624,7 +873,12 @@ public final class AppContracts {
 			String dosage,
 			@NotBlank(message = "频次不能为空")
 			String frequency,
-			String remark
+			String remark,
+			@Min(value = 0, message = "剩余药量天数不能为负数")
+			Integer remainingDays,
+			@Min(value = 1, message = "补药提醒阈值不能小于1天")
+			@Max(value = 30, message = "补药提醒阈值不能大于30天")
+			Integer refillThresholdDays
 	) {
 	}
 
@@ -639,6 +893,83 @@ public final class AppContracts {
 			List<MedicationItem> currentMedications,
 			String followUpNote,
 			Instant updatedAt
+	) {
+	}
+
+	public record MedicationCheckinRequest(
+			@NotBlank(message = "药物名称不能为空")
+			String medicationName,
+			@NotBlank(message = "服药时段不能为空")
+			String scheduledPeriod,
+			@NotBlank(message = "服药状态不能为空")
+			String status,
+			String note
+	) {
+	}
+
+	public record MedicationCheckinResponse(
+			String checkinId,
+			String medicationName,
+			String scheduledPeriod,
+			String status,
+			String guidance,
+			String note,
+			String checkinDate,
+			Instant checkinAt
+	) {
+	}
+
+	public record MedicationAdherenceSummaryResponse(
+			String summaryDate,
+			int plannedDoseCount,
+			int takenDoseCount,
+			int missedDoseCount,
+			int skippedDoseCount,
+			int adherenceRate,
+			int currentStreakDays,
+			List<String> overdueItems,
+			List<String> nextActions,
+			List<MedicationCheckinResponse> recentCheckins
+	) {
+	}
+
+	public record MedicationAdherenceDayResponse(
+			String summaryDate,
+			int plannedDoseCount,
+			int takenDoseCount,
+			int missedDoseCount,
+			int skippedDoseCount,
+			int adherenceRate
+	) {
+	}
+
+	public record MedicationRefillAlertResponse(
+			String medicationName,
+			String dosage,
+			Integer remainingDays,
+			Integer refillThresholdDays,
+			RiskLevel riskLevel,
+			String suggestion
+	) {
+	}
+
+	public record MedicationWeeklyReportResponse(
+			String startDate,
+			String endDate,
+			int plannedDoseCount,
+			int takenDoseCount,
+			int missedDoseCount,
+			int skippedDoseCount,
+			int overdueDoseCount,
+			int adherenceRate,
+			int currentStreakDays,
+			int longestStreakDays,
+			List<MedicationAdherenceDayResponse> dailyBreakdown,
+			List<String> focusMedications,
+			List<MedicationRefillAlertResponse> refillAlerts,
+			List<String> highlights,
+			List<String> nextActions,
+			Instant generatedAt
 	) {
 	}
 }

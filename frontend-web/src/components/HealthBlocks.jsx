@@ -88,7 +88,17 @@ export function ArraySummary({ title, items, emptyMessage = "暂无数据。" })
   );
 }
 
-export function MemberList({ title, items, onViewSummary, onRemove, busyMap }) {
+export function MemberList({
+  title,
+  items,
+  onViewSummary,
+  onViewWeeklyReport,
+  onManagePermission,
+  permissionDrafts,
+  setPermissionDrafts,
+  onRemove,
+  busyMap,
+}) {
   return (
     <div className="stack-list">
       <strong className="subtle-title">{title}</strong>
@@ -108,10 +118,76 @@ export function MemberList({ title, items, onViewSummary, onRemove, busyMap }) {
               <span>{item.status}</span>
               <span>{formatDateTime(item.createdAt)}</span>
             </div>
+            <div className="list-card__meta">
+              <span>权限：{item.caregiverPermission || "REMINDER"}</span>
+              <span>周报：{item.weeklyReportEnabled ? "已开放" : "未开放"} / 提醒：{item.notifyOnHighRisk ? "开启" : "关闭"}</span>
+            </div>
+            {onManagePermission && permissionDrafts?.[item.bindingCode] ? (
+              <div className="stack-form compact-form">
+                <label>
+                  <span>权限级别</span>
+                  <select
+                    value={permissionDrafts[item.bindingCode].caregiverPermission}
+                    onChange={(event) => setPermissionDrafts((current) => ({
+                      ...current,
+                      [item.bindingCode]: {
+                        ...current[item.bindingCode],
+                        caregiverPermission: event.target.value,
+                      },
+                    }))}
+                  >
+                    <option value="READ_ONLY">只读</option>
+                    <option value="REMINDER">提醒协同</option>
+                    <option value="TASK">共同照护</option>
+                  </select>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={permissionDrafts[item.bindingCode].weeklyReportEnabled}
+                    onChange={(event) => setPermissionDrafts((current) => ({
+                      ...current,
+                      [item.bindingCode]: {
+                        ...current[item.bindingCode],
+                        weeklyReportEnabled: event.target.checked,
+                      },
+                    }))}
+                  />
+                  <span>开放周报共享</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={permissionDrafts[item.bindingCode].notifyOnHighRisk}
+                    onChange={(event) => setPermissionDrafts((current) => ({
+                      ...current,
+                      [item.bindingCode]: {
+                        ...current[item.bindingCode],
+                        notifyOnHighRisk: event.target.checked,
+                      },
+                    }))}
+                  />
+                  <span>开启高风险提醒</span>
+                </label>
+                <button
+                  className="ghost-button action-button"
+                  type="button"
+                  disabled={busyMap[`family-permission-${item.bindingCode}`]}
+                  onClick={() => onManagePermission(item.bindingCode, permissionDrafts[item.bindingCode])}
+                >
+                  {busyMap[`family-permission-${item.bindingCode}`] ? "保存中..." : "保存权限"}
+                </button>
+              </div>
+            ) : null}
             <div className="action-row">
               {item.patientUserId && onViewSummary ? (
                 <button className="ghost-button action-button" type="button" onClick={() => onViewSummary(item.patientUserId)}>
                   查看患者摘要
+                </button>
+              ) : null}
+              {item.patientUserId && onViewWeeklyReport ? (
+                <button className="ghost-button action-button" type="button" onClick={() => onViewWeeklyReport(item.patientUserId)}>
+                  查看共享周报
                 </button>
               ) : null}
               <button

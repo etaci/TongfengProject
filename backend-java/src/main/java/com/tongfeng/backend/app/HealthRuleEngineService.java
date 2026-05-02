@@ -1,10 +1,12 @@
 package com.tongfeng.backend.app;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.tongfeng.backend.app.persistence.entity.DailyHealthSummaryEntity;
 import com.tongfeng.backend.app.persistence.entity.FlareRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.HydrationRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.LabReportRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.MealRecordEntity;
+import com.tongfeng.backend.app.persistence.entity.MedicationPlanEntity;
 import com.tongfeng.backend.app.persistence.entity.ProactiveCareSettingEntity;
 import com.tongfeng.backend.app.persistence.entity.ReminderEventEntity;
 import com.tongfeng.backend.app.persistence.entity.UricAcidRecordEntity;
@@ -15,6 +17,7 @@ import com.tongfeng.backend.app.persistence.repo.FlareRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.HydrationRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.LabReportRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.MealRecordRepository;
+import com.tongfeng.backend.app.persistence.repo.MedicationPlanRepository;
 import com.tongfeng.backend.app.persistence.repo.ProactiveCareSettingRepository;
 import com.tongfeng.backend.app.persistence.repo.ReminderEventRepository;
 import com.tongfeng.backend.app.persistence.repo.UricAcidRecordRepository;
@@ -31,12 +34,15 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class HealthRuleEngineService {
 
 	private static final String STATUS_ACTIVE = "ACTIVE";
 	private static final String SOURCE_RULE_ENGINE = "RULE_ENGINE";
+	private static final TypeReference<List<AppContracts.MedicationItem>> MEDICATION_ITEM_LIST_TYPE = new TypeReference<>() {
+	};
 
 	private final ReminderEventRepository reminderEventRepository;
 	private final DailyHealthSummaryRepository dailyHealthSummaryRepository;
@@ -46,9 +52,11 @@ public class HealthRuleEngineService {
 	private final HydrationRecordRepository hydrationRecordRepository;
 	private final MealRecordRepository mealRecordRepository;
 	private final LabReportRecordRepository labReportRecordRepository;
+	private final MedicationPlanRepository medicationPlanRepository;
 	private final ProactiveCareSettingRepository proactiveCareSettingRepository;
 	private final WeatherDailySnapshotRepository weatherDailySnapshotRepository;
 	private final IdGenerator idGenerator;
+	private final JsonCodec jsonCodec;
 
 	public HealthRuleEngineService(
 			ReminderEventRepository reminderEventRepository,
@@ -59,9 +67,11 @@ public class HealthRuleEngineService {
 			HydrationRecordRepository hydrationRecordRepository,
 			MealRecordRepository mealRecordRepository,
 			LabReportRecordRepository labReportRecordRepository,
+			MedicationPlanRepository medicationPlanRepository,
 			ProactiveCareSettingRepository proactiveCareSettingRepository,
 			WeatherDailySnapshotRepository weatherDailySnapshotRepository,
-			IdGenerator idGenerator
+			IdGenerator idGenerator,
+			JsonCodec jsonCodec
 	) {
 		this.reminderEventRepository = reminderEventRepository;
 		this.dailyHealthSummaryRepository = dailyHealthSummaryRepository;
@@ -71,9 +81,11 @@ public class HealthRuleEngineService {
 		this.hydrationRecordRepository = hydrationRecordRepository;
 		this.mealRecordRepository = mealRecordRepository;
 		this.labReportRecordRepository = labReportRecordRepository;
+		this.medicationPlanRepository = medicationPlanRepository;
 		this.proactiveCareSettingRepository = proactiveCareSettingRepository;
 		this.weatherDailySnapshotRepository = weatherDailySnapshotRepository;
 		this.idGenerator = idGenerator;
+		this.jsonCodec = jsonCodec;
 	}
 
 	@Transactional
@@ -272,6 +284,9 @@ public class HealthRuleEngineService {
 			reminders.add(reminder("LAB", "化验单结果需要跟进", latestLab.get().getSummaryText(), AppContracts.RiskLevel.RED, latestLab.get().getReportDate().atStartOfDay(ZoneId.systemDefault()).toInstant()));
 		}
 
+		medicationPlanRepository.findByUserCode(userId)
+				.ifPresent(plan -> reminders.addAll(buildMedicationRefillReminders(plan, now)));
+
 		Optional<ProactiveCareSettingEntity> careSetting = proactiveCareSettingRepository.findByUserCode(userId);
 		Optional<WeatherDailySnapshotEntity> weatherSnapshot = weatherDailySnapshotRepository.findByUserCodeAndSummaryDate(userId, LocalDate.now());
 		if (careSetting.isPresent() && careSetting.get().isWeatherAlertsEnabled() && weatherSnapshot.isPresent()) {
@@ -297,6 +312,27 @@ public class HealthRuleEngineService {
 						.reversed()
 						.thenComparing(AppContracts.ReminderResponse::triggerAt, Comparator.reverseOrder()))
 				.toList();
+	}
+
+	private List<AppContracts.ReminderResponse> buildMedicationRefillReminders(MedicationPlanEntity plan, Instant now) {
+		List<AppContracts.ReminderResponse> reminders = new ArrayList<>();
+		readMedicationItems(plan.getCurrentMedicationsJson()).forEach(item -> {
+			if (item.remainingDays() == null) {
+				return;
+			}
+			int thresholdDays = item.refillThresholdDays() == null ? 3 : item.refillThresholdDays();
+			if (item.remainingDays() > thresholdDays) {
+				return;
+			}
+			AppContracts.RiskLevel riskLevel = item.remainingDays() <= 1
+					? AppContracts.RiskLevel.RED
+					: AppContracts.RiskLevel.YELLOW;
+			String content = item.remainingDays() <= 1
+					? item.name() + " 剩余药量预计只够 " + item.remainingDays() + " 天，建议今天就安排补药，避免断药。"
+					: item.name() + " 剩余药量预计还能用 " + item.remainingDays() + " 天，建议提前安排补药。";
+			reminders.add(reminder("MEDICATION_REFILL", "补药时间快到了", content, riskLevel, now));
+		});
+		return reminders;
 	}
 
 	private AppContracts.ReminderResponse reminder(
@@ -326,6 +362,13 @@ public class HealthRuleEngineService {
 	) {
 		String uaText = latestUa == null ? "暂无尿酸数据" : ("尿酸 " + latestUa.getUaValue() + " " + latestUa.getUaUnit());
 		return summaryDate + " 汇总：" + uaText + "，高风险饮食 " + highRiskMealCount + " 次，饮水 " + totalWater + "ml，发作 " + flareCount + " 次，整体风险 " + riskLevel + "。";
+	}
+
+	private List<AppContracts.MedicationItem> readMedicationItems(String json) {
+		if (!StringUtils.hasText(json)) {
+			return List.of();
+		}
+		return jsonCodec.fromJson(json, MEDICATION_ITEM_LIST_TYPE);
 	}
 
 	private AppContracts.RiskLevel uricAcidRisk(Integer value) {

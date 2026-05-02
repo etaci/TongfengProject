@@ -1,0 +1,39 @@
+### 用户登录
+POST http://localhost:8080/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "lab-review-v18"
+}
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 上传并解析化验单
+POST http://localhost:8080/api/v1/lab-reports/analyze
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="reportDate"
+
+2026-05-02
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="lab-report.png"
+Content-Type: image/png
+
+< ./lab-report.png
+--WebAppBoundary--
+
+> {%
+client.global.set("report_id", response.body.data.reportId);
+%}
+
+### 查看化验单列表
+GET http://localhost:8080/api/v1/lab-reports
+Authorization: Bearer {{token}}
+
+### 查看该份化验单复盘
+GET http://localhost:8080/api/v1/lab-reports/{{report_id}}/review
+Authorization: Bearer {{token}}

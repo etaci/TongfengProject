@@ -1,0 +1,5 @@
+# Created at 2026-05-02T21:22:46.620
+Boot Manifest-JAR contains absolute paths in classpath 'H:\ProjectTongfeng\backend-java\target\test-classes'
+Hint: <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+'other' has different root
+

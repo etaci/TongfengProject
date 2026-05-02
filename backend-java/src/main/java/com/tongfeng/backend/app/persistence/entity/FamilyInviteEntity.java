@@ -39,6 +39,15 @@ public class FamilyInviteEntity {
 	@Column(nullable = false, length = 32)
 	private String status;
 
+	@Column(nullable = false, length = 32)
+	private String caregiverPermission;
+
+	@Column(nullable = false)
+	private boolean weeklyReportEnabled;
+
+	@Column(nullable = false)
+	private boolean notifyOnHighRisk;
+
 	@Column(length = 64)
 	private String acceptedByUserCode;
 
@@ -101,6 +110,30 @@ public class FamilyInviteEntity {
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	public String getCaregiverPermission() {
+		return caregiverPermission;
+	}
+
+	public void setCaregiverPermission(String caregiverPermission) {
+		this.caregiverPermission = caregiverPermission;
+	}
+
+	public boolean isWeeklyReportEnabled() {
+		return weeklyReportEnabled;
+	}
+
+	public void setWeeklyReportEnabled(boolean weeklyReportEnabled) {
+		this.weeklyReportEnabled = weeklyReportEnabled;
+	}
+
+	public boolean isNotifyOnHighRisk() {
+		return notifyOnHighRisk;
+	}
+
+	public void setNotifyOnHighRisk(boolean notifyOnHighRisk) {
+		this.notifyOnHighRisk = notifyOnHighRisk;
 	}
 
 	public String getAcceptedByUserCode() {

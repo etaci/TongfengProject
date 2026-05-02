@@ -17,12 +17,23 @@ export const genderOptions = [
   { label: "其他", value: "OTHER" },
 ];
 
+export const authAccountTypeOptions = [
+  { label: "邮箱", value: "EMAIL" },
+  { label: "手机号", value: "PHONE" },
+];
+
 export const familyRelationOptions = [
   { label: "配偶", value: "SPOUSE" },
   { label: "父母", value: "PARENT" },
   { label: "子女", value: "CHILD" },
   { label: "兄弟姐妹", value: "SIBLING" },
   { label: "其他", value: "OTHER" },
+];
+
+export const familyPermissionOptions = [
+  { label: "只读", value: "READ_ONLY" },
+  { label: "提醒协同", value: "REMINDER" },
+  { label: "共同照护", value: "TASK" },
 ];
 
 export const countryOptions = [

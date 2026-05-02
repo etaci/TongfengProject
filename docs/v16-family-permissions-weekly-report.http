@@ -1,0 +1,69 @@
+### 患者登录
+POST http://localhost:8080/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "patient-v16"
+}
+
+> {%
+client.global.set("patient_token", response.body.data.token);
+client.global.set("patient_user_id", response.body.data.userId);
+%}
+
+### 家属登录
+POST http://localhost:8080/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "caregiver-v16"
+}
+
+> {%
+client.global.set("caregiver_token", response.body.data.token);
+%}
+
+### 发起邀请（带权限）
+POST http://localhost:8080/api/v1/family/invitations
+Authorization: Bearer {{patient_token}}
+Content-Type: application/json
+
+{
+  "relationType": "SPOUSE",
+  "inviteMessage": "一起看周报和风险提醒",
+  "expiresInDays": 7,
+  "caregiverPermission": "TASK",
+  "weeklyReportEnabled": true,
+  "notifyOnHighRisk": true
+}
+
+> {%
+client.global.set("invite_code", response.body.data.inviteCode);
+%}
+
+### 家属接受邀请
+POST http://localhost:8080/api/v1/family/invitations/{{invite_code}}/accept
+Authorization: Bearer {{caregiver_token}}
+
+### 查看成员
+GET http://localhost:8080/api/v1/family/members
+Authorization: Bearer {{patient_token}}
+
+### 家属查看患者摘要
+GET http://localhost:8080/api/v1/family/patients/{{patient_user_id}}/summary
+Authorization: Bearer {{caregiver_token}}
+
+### 家属查看共享周报
+GET http://localhost:8080/api/v1/family/patients/{{patient_user_id}}/weekly-report?days=7
+Authorization: Bearer {{caregiver_token}}
+
+### 患者关闭周报共享和高风险提醒
+PUT http://localhost:8080/api/v1/family/members/{{binding_code}}/permissions
+Authorization: Bearer {{patient_token}}
+Content-Type: application/json
+
+{
+  "caregiverPermission": "READ_ONLY",
+  "weeklyReportEnabled": false,
+  "notifyOnHighRisk": false
+}

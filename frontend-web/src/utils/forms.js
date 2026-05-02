@@ -27,7 +27,7 @@ export function parseMedicationText(value) {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const [name, dosage, frequency, remark] = line.split("|").map((item) => item.trim());
+      const [name, dosage, frequency, remark, remainingDays, refillThresholdDays] = line.split("|").map((item) => item.trim());
 
       if (!name || !dosage || !frequency) {
         throw new Error(`用药格式不完整：${line}`);
@@ -38,6 +38,8 @@ export function parseMedicationText(value) {
         dosage,
         frequency,
         remark: remark || null,
+        remainingDays: remainingDays ? Number(remainingDays) : null,
+        refillThresholdDays: refillThresholdDays ? Number(refillThresholdDays) : null,
       };
     });
 }
@@ -58,8 +60,47 @@ export function mapProfileToForm(profile, fallbackName = "") {
 export function mapMedicationToText(plan) {
   return {
     lines: (plan?.currentMedications || [])
-      .map((item) => [item.name, item.dosage, item.frequency, item.remark || ""].join(" | "))
+      .map((item) => {
+        const parts = [item.name, item.dosage, item.frequency, item.remark || ""];
+        if (item.remainingDays != null || item.refillThresholdDays != null) {
+          parts.push(item.remainingDays ?? "", item.refillThresholdDays ?? "");
+        }
+        return parts.join(" | ");
+      })
       .join("\n"),
     followUpNote: plan?.followUpNote || "",
   };
+}
+
+export function getMedicationPeriods(frequency) {
+  const normalized = String(frequency || "").trim().toLowerCase();
+
+  if (["twice-daily", "bid", "q12h", "每日两次", "一天两次"].includes(normalized)) {
+    return ["MORNING", "EVENING"];
+  }
+
+  if (["three-times-daily", "tid", "q8h", "每日三次", "一天三次"].includes(normalized)) {
+    return ["MORNING", "NOON", "EVENING"];
+  }
+
+  if (["bedtime", "睡前", "每晚睡前"].includes(normalized)) {
+    return ["BEDTIME"];
+  }
+
+  return ["MORNING"];
+}
+
+export function getMedicationPeriodLabel(period) {
+  switch (period) {
+    case "MORNING":
+      return "早晨";
+    case "NOON":
+      return "中午";
+    case "EVENING":
+      return "晚上";
+    case "BEDTIME":
+      return "睡前";
+    default:
+      return period || "未设置";
+  }
 }

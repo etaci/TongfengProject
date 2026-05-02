@@ -1,0 +1,102 @@
+@baseUrl = http://localhost:8080
+@account = v20-security@example.com
+@oldPassword = Password123
+@newPassword = Password456
+
+### 注册正式账号
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "nickname": "安全中心用户",
+  "accountType": "EMAIL",
+  "account": "{{account}}",
+  "password": "{{oldPassword}}",
+  "confirmPassword": "{{oldPassword}}",
+  "consent": {
+    "consentVersion": "v1.0",
+    "privacyPolicyVersion": "privacy-v1.0",
+    "privacyAccepted": true,
+    "termsAccepted": true,
+    "medicalDataAuthorized": true,
+    "familyCollaborationAuthorized": true,
+    "notificationAuthorized": true
+  }
+}
+
+> {%
+client.global.set("token", response.body.data.token);
+client.global.set("session_code_1", response.body.data.sessionCode);
+%}
+
+### 再登录一次，制造第二个活跃会话
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "accountType": "EMAIL",
+  "account": "{{account}}",
+  "password": "{{oldPassword}}"
+}
+
+> {%
+client.global.set("token_2", response.body.data.token);
+client.global.set("session_code_2", response.body.data.sessionCode);
+%}
+
+### 查看活跃会话
+GET {{baseUrl}}/api/v1/auth/sessions
+Authorization: Bearer {{token_2}}
+
+### 修改密码并退出其他设备
+PUT {{baseUrl}}/api/v1/auth/password
+Authorization: Bearer {{token_2}}
+Content-Type: application/json
+
+{
+  "currentPassword": "{{oldPassword}}",
+  "newPassword": "{{newPassword}}",
+  "confirmPassword": "{{newPassword}}",
+  "logoutOtherSessions": true
+}
+
+### 用旧 token 访问，预期失败
+GET {{baseUrl}}/api/v1/auth/session
+Authorization: Bearer {{token}}
+
+### 使用旧密码登录，预期失败
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "accountType": "EMAIL",
+  "account": "{{account}}",
+  "password": "{{oldPassword}}"
+}
+
+### 使用新密码登录
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "accountType": "EMAIL",
+  "account": "{{account}}",
+  "password": "{{newPassword}}"
+}
+
+> {%
+client.global.set("token_3", response.body.data.token);
+client.global.set("session_code_3", response.body.data.sessionCode);
+%}
+
+### 用第三个会话移除第二个会话
+DELETE {{baseUrl}}/api/v1/auth/sessions/{{session_code_2}}
+Authorization: Bearer {{token_3}}
+
+### 验证第二个会话已失效
+GET {{baseUrl}}/api/v1/auth/session
+Authorization: Bearer {{token_2}}
+
+### 当前活跃会话应只剩一个
+GET {{baseUrl}}/api/v1/auth/sessions
+Authorization: Bearer {{token_3}}

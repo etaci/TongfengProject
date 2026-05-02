@@ -12,11 +12,94 @@ export function mockLogin(nickname) {
   );
 }
 
+export function registerAccount(payload) {
+  return apiRequest(
+    "/api/v1/auth/register",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      skipAuth: true,
+    },
+    null,
+  );
+}
+
+export function loginWithPassword(payload) {
+  return apiRequest(
+    "/api/v1/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      skipAuth: true,
+    },
+    null,
+  );
+}
+
+export function logoutSession(session) {
+  return apiRequest(
+    "/api/v1/auth/logout",
+    {
+      method: "POST",
+    },
+    session,
+  );
+}
+
+export function getCurrentSession(session) {
+  return apiRequest("/api/v1/auth/session", {}, session);
+}
+
+export function getActiveSessions(session) {
+  return apiRequest("/api/v1/auth/sessions", {}, session);
+}
+
+export function changePassword(session, payload) {
+  return apiRequest(
+    "/api/v1/auth/password",
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    session,
+  );
+}
+
+export function revokeSession(session, sessionCode) {
+  return apiRequest(
+    `/api/v1/auth/sessions/${encodeURIComponent(sessionCode)}`,
+    {
+      method: "DELETE",
+    },
+    session,
+  );
+}
+
+export function getCurrentPrivacyConsent(session) {
+  return apiRequest("/api/v1/privacy/consents/current", {}, session);
+}
+
+export function getPrivacyConsentHistory(session) {
+  return apiRequest("/api/v1/privacy/consents/history", {}, session);
+}
+
+export function updatePrivacyConsent(session, payload) {
+  return apiRequest(
+    "/api/v1/privacy/consents/current",
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    session,
+  );
+}
+
 export function getBootstrapData(session, days) {
   return Promise.all([
     apiRequest("/api/v1/app/capabilities", {}, session),
     apiRequest("/api/v1/profile", {}, session),
     apiRequest("/api/v1/dashboard/overview", {}, session),
+    apiRequest("/api/v1/home/today", {}, session),
     apiRequest(`/api/v1/dashboard/trends?days=${days}`, {}, session),
     apiRequest(`/api/v1/dashboard/daily-summaries?days=${days}`, {}, session),
     apiRequest("/api/v1/reminders", {}, session),
@@ -26,6 +109,8 @@ export function getBootstrapData(session, days) {
     apiRequest("/api/v1/persona/summary", {}, session),
     apiRequest("/api/v1/analysis/uric-acid-causes?lookbackDays=7", {}, session),
     apiRequest("/api/v1/medications", {}, session),
+    apiRequest("/api/v1/medications/adherence?days=7", {}, session),
+    apiRequest("/api/v1/medications/weekly-report?days=7", {}, session),
     apiRequest("/api/v1/mvp/metrics/summary?days=7", {}, session),
   ]);
 }
@@ -41,6 +126,10 @@ export function getRecordSnapshots(session) {
 
 export async function getExtendedData(session, { familyEnabled = false } = {}) {
   const requestEntries = [
+    ["authSession", () => getCurrentSession(session)],
+    ["authActiveSessions", () => getActiveSessions(session)],
+    ["privacyConsentCurrent", () => getCurrentPrivacyConsent(session)],
+    ["privacyConsentHistory", () => getPrivacyConsentHistory(session)],
     ["proactiveSettings", () => apiRequest("/api/v1/proactive-care/settings", {}, session)],
     ["proactiveBrief", () => apiRequest("/api/v1/proactive-care/brief", {}, session)],
     ["flareReview", () => apiRequest("/api/v1/flares/reports/latest", {}, session)],
@@ -52,6 +141,7 @@ export async function getExtendedData(session, { familyEnabled = false } = {}) {
       ["familyInvites", () => apiRequest("/api/v1/family/invitations", {}, session)],
       ["familyMembers", () => apiRequest("/api/v1/family/members", {}, session)],
       ["familyAlerts", () => apiRequest("/api/v1/family/alerts", {}, session)],
+      ["familyTasks", () => apiRequest("/api/v1/family/tasks", {}, session)],
     );
   }
 
@@ -75,6 +165,21 @@ export async function getExtendedData(session, { familyEnabled = false } = {}) {
       return accumulator;
     }
 
+    if (name === "familyTasks") {
+      accumulator[name] = { asPatient: [], asCaregiver: [] };
+      return accumulator;
+    }
+
+    if (name === "privacyConsentHistory") {
+      accumulator[name] = [];
+      return accumulator;
+    }
+
+    if (name === "authActiveSessions") {
+      accumulator[name] = [];
+      return accumulator;
+    }
+
     if (name === "recordCenter") {
       accumulator[name] = {
         types: [],
@@ -91,9 +196,14 @@ export async function getExtendedData(session, { familyEnabled = false } = {}) {
     accumulator[name] = null;
     return accumulator;
   }, {
+    authSession: null,
+    authActiveSessions: [],
+    privacyConsentCurrent: null,
+    privacyConsentHistory: [],
     familyInvites: [],
     familyMembers: { asPatient: [], asCaregiver: [] },
     familyAlerts: [],
+    familyTasks: { asPatient: [], asCaregiver: [] },
     devices: [],
     deviceCatalog: [],
     deviceOverview: null,
@@ -111,6 +221,7 @@ export function getDashboardBundle(session, days) {
   return Promise.all([
     apiRequest("/api/v1/app/capabilities", {}, session),
     apiRequest("/api/v1/dashboard/overview", {}, session),
+    apiRequest("/api/v1/home/today", {}, session),
     apiRequest(`/api/v1/dashboard/trends?days=${days}`, {}, session),
     apiRequest(`/api/v1/dashboard/daily-summaries?days=${days}`, {}, session),
     apiRequest("/api/v1/reminders", {}, session),
@@ -119,6 +230,8 @@ export function getDashboardBundle(session, days) {
     apiRequest("/api/v1/lab-reports", {}, session),
     apiRequest("/api/v1/persona/summary", {}, session),
     apiRequest("/api/v1/analysis/uric-acid-causes?lookbackDays=7", {}, session),
+    apiRequest("/api/v1/medications/adherence?days=7", {}, session),
+    apiRequest("/api/v1/medications/weekly-report?days=7", {}, session),
     apiRequest("/api/v1/mvp/metrics/summary?days=7", {}, session),
   ]);
 }
@@ -147,6 +260,25 @@ export function updateMedications(session, payload) {
     "/api/v1/medications",
     {
       method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    session,
+  );
+}
+
+export function getMedicationAdherence(session, days = 7) {
+  return apiRequest(`/api/v1/medications/adherence?days=${days}`, {}, session);
+}
+
+export function getMedicationWeeklyReport(session, days = 7) {
+  return apiRequest(`/api/v1/medications/weekly-report?days=${days}`, {}, session);
+}
+
+export function submitMedicationCheckin(session, payload) {
+  return apiRequest(
+    "/api/v1/medications/check-ins",
+    {
+      method: "POST",
       body: JSON.stringify(payload),
     },
     session,
@@ -184,6 +316,10 @@ export function analyzeLab(session, payload) {
     },
     session,
   );
+}
+
+export function getLabReportReview(session, reportId) {
+  return apiRequest(`/api/v1/lab-reports/${reportId}/review`, {}, session);
 }
 
 export function askKnowledge(session, payload) {
@@ -251,6 +387,47 @@ export function removeFamilyBinding(session, bindingCode) {
 
 export function getFamilyPatientSummary(session, patientUserId) {
   return apiRequest(`/api/v1/family/patients/${patientUserId}/summary`, {}, session);
+}
+
+export function getFamilyWeeklyReport(session, patientUserId, days = 7) {
+  return apiRequest(`/api/v1/family/patients/${patientUserId}/weekly-report?days=${days}`, {}, session);
+}
+
+export function updateFamilyBindingPermissions(session, bindingCode, payload) {
+  return apiRequest(
+    `/api/v1/family/members/${bindingCode}/permissions`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    session,
+  );
+}
+
+export function getFamilyTasks(session) {
+  return apiRequest("/api/v1/family/tasks", {}, session);
+}
+
+export function createFamilyTask(session, bindingCode, payload) {
+  return apiRequest(
+    `/api/v1/family/members/${bindingCode}/tasks`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    session,
+  );
+}
+
+export function completeFamilyTask(session, taskCode, payload) {
+  return apiRequest(
+    `/api/v1/family/tasks/${taskCode}/complete`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    session,
+  );
 }
 
 export function bindDevice(session, payload) {

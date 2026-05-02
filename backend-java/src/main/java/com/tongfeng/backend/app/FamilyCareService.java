@@ -2,11 +2,13 @@ package com.tongfeng.backend.app;
 
 import com.tongfeng.backend.app.persistence.entity.FamilyBindingEntity;
 import com.tongfeng.backend.app.persistence.entity.FamilyInviteEntity;
+import com.tongfeng.backend.app.persistence.entity.FamilyTaskEntity;
 import com.tongfeng.backend.app.persistence.entity.FlareRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.UricAcidRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.UserAccountEntity;
 import com.tongfeng.backend.app.persistence.repo.FamilyBindingRepository;
 import com.tongfeng.backend.app.persistence.repo.FamilyInviteRepository;
+import com.tongfeng.backend.app.persistence.repo.FamilyTaskRepository;
 import com.tongfeng.backend.app.persistence.repo.FlareRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.UricAcidRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.UserAccountRepository;
@@ -31,9 +33,15 @@ public class FamilyCareService {
 	private static final String STATUS_EXPIRED = "EXPIRED";
 	private static final String STATUS_ACTIVE = "ACTIVE";
 	private static final String STATUS_UNBOUND = "UNBOUND";
+	private static final String STATUS_OPEN = "OPEN";
+	private static final String STATUS_COMPLETED = "COMPLETED";
+	private static final String PERMISSION_READ_ONLY = "READ_ONLY";
+	private static final String PERMISSION_REMINDER = "REMINDER";
+	private static final String PERMISSION_TASK = "TASK";
 
 	private final FamilyInviteRepository familyInviteRepository;
 	private final FamilyBindingRepository familyBindingRepository;
+	private final FamilyTaskRepository familyTaskRepository;
 	private final UserAccountRepository userAccountRepository;
 	private final UricAcidRecordRepository uricAcidRecordRepository;
 	private final FlareRecordRepository flareRecordRepository;
@@ -44,6 +52,7 @@ public class FamilyCareService {
 	public FamilyCareService(
 			FamilyInviteRepository familyInviteRepository,
 			FamilyBindingRepository familyBindingRepository,
+			FamilyTaskRepository familyTaskRepository,
 			UserAccountRepository userAccountRepository,
 			UricAcidRecordRepository uricAcidRecordRepository,
 			FlareRecordRepository flareRecordRepository,
@@ -53,6 +62,7 @@ public class FamilyCareService {
 	) {
 		this.familyInviteRepository = familyInviteRepository;
 		this.familyBindingRepository = familyBindingRepository;
+		this.familyTaskRepository = familyTaskRepository;
 		this.userAccountRepository = userAccountRepository;
 		this.uricAcidRecordRepository = uricAcidRecordRepository;
 		this.flareRecordRepository = flareRecordRepository;
@@ -72,6 +82,9 @@ public class FamilyCareService {
 		entity.setRelationType(request.relationType().trim());
 		entity.setInviteMessage(StringUtils.hasText(request.inviteMessage()) ? request.inviteMessage().trim() : "邀请家属一起关注近期痛风风险。");
 		entity.setStatus(STATUS_PENDING);
+		entity.setCaregiverPermission(normalizeCaregiverPermission(request.caregiverPermission()));
+		entity.setWeeklyReportEnabled(defaultBoolean(request.weeklyReportEnabled(), true));
+		entity.setNotifyOnHighRisk(defaultBoolean(request.notifyOnHighRisk(), true));
 		entity.setExpiresAt(now.plus(defaultDays(request.expiresInDays()), ChronoUnit.DAYS));
 		entity.setCreatedAt(now);
 		entity.setUpdatedAt(now);
@@ -122,6 +135,9 @@ public class FamilyCareService {
 		binding.setCaregiverUserCode(caregiverUserId);
 		binding.setRelationType(invite.getRelationType());
 		binding.setStatus(STATUS_ACTIVE);
+		binding.setCaregiverPermission(invite.getCaregiverPermission());
+		binding.setWeeklyReportEnabled(invite.isWeeklyReportEnabled());
+		binding.setNotifyOnHighRisk(invite.isNotifyOnHighRisk());
 		binding.setSourceInviteCode(invite.getInviteCode());
 		binding.setCreatedAt(now);
 		binding.setUpdatedAt(now);
@@ -164,6 +180,28 @@ public class FamilyCareService {
 	}
 
 	@Transactional
+	public AppContracts.FamilyBindingMemberResponse updateBindingPermissions(
+			String currentUserId,
+			String bindingCode,
+			AppContracts.FamilyBindingPermissionUpdateRequest request
+	) {
+		FamilyBindingEntity binding = familyBindingRepository.findByBindingCode(bindingCode)
+				.orElseThrow(() -> new BusinessException("BINDING_NOT_FOUND", "绑定关系不存在"));
+		if (!Objects.equals(binding.getPatientUserCode(), currentUserId)) {
+			throw new BusinessException("FORBIDDEN", "只有患者本人可以调整家属权限");
+		}
+		if (!STATUS_ACTIVE.equals(binding.getStatus())) {
+			throw new BusinessException("BINDING_INACTIVE", "当前绑定关系不可调整权限");
+		}
+		binding.setCaregiverPermission(normalizeCaregiverPermission(request.caregiverPermission()));
+		binding.setWeeklyReportEnabled(defaultBoolean(request.weeklyReportEnabled(), binding.isWeeklyReportEnabled()));
+		binding.setNotifyOnHighRisk(defaultBoolean(request.notifyOnHighRisk(), binding.isNotifyOnHighRisk()));
+		binding.setUpdatedAt(Instant.now());
+		familyBindingRepository.save(binding);
+		return toBindingResponse(binding);
+	}
+
+	@Transactional
 	public AppContracts.FamilyBindingMemberResponse removeBinding(String currentUserId, String bindingCode) {
 		FamilyBindingEntity binding = familyBindingRepository.findByBindingCode(bindingCode)
 				.orElseThrow(() -> new BusinessException("BINDING_NOT_FOUND", "绑定关系不存在"));
@@ -180,6 +218,9 @@ public class FamilyCareService {
 		List<AppContracts.FamilyAlertResponse> alerts = new ArrayList<>();
 		for (FamilyBindingEntity binding : familyBindingRepository.findByCaregiverUserCodeOrderByCreatedAtDesc(caregiverUserId)) {
 			if (!STATUS_ACTIVE.equals(binding.getStatus())) {
+				continue;
+			}
+			if (!binding.isNotifyOnHighRisk() || !canReceiveAlerts(binding)) {
 				continue;
 			}
 			UserAccountEntity patient = requireAccount(binding.getPatientUserCode());
@@ -224,8 +265,7 @@ public class FamilyCareService {
 	}
 
 	public AppContracts.FamilyPatientSummaryResponse getPatientSummary(String caregiverUserId, String patientUserId) {
-		FamilyBindingEntity binding = familyBindingRepository.findByPatientUserCodeAndCaregiverUserCodeAndStatus(patientUserId, caregiverUserId, STATUS_ACTIVE)
-				.orElseThrow(() -> new BusinessException("FORBIDDEN", "当前没有该患者的有效家属授权"));
+		FamilyBindingEntity binding = requireActiveBinding(patientUserId, caregiverUserId);
 		UserAccountEntity patient = requireAccount(patientUserId);
 		AppContracts.ProactiveCareBriefResponse brief = proactiveCareService.getProactiveCareBrief(patientUserId);
 		List<AppContracts.ReminderResponse> reminders = healthRuleEngineService.getActiveReminders(patientUserId);
@@ -235,6 +275,8 @@ public class FamilyCareService {
 				patient.getUserCode(),
 				patient.getNickname(),
 				binding.getRelationType(),
+				binding.getCaregiverPermission(),
+				binding.isWeeklyReportEnabled(),
 				brief.overallRiskLevel(),
 				brief.summary(),
 				brief.suggestions(),
@@ -246,6 +288,80 @@ public class FamilyCareService {
 				brief.suggestions(),
 				brief.generatedAt()
 		);
+	}
+
+	public AppContracts.FamilyBindingMemberResponse requireSharedWeeklyReportAccess(String caregiverUserId, String patientUserId) {
+		FamilyBindingEntity binding = requireActiveBinding(patientUserId, caregiverUserId);
+		if (!binding.isWeeklyReportEnabled()) {
+			throw new BusinessException("WEEKLY_REPORT_DISABLED", "当前患者尚未向该家属开放周报共享。");
+		}
+		return toBindingResponse(binding);
+	}
+
+	public AppContracts.FamilyTasksResponse getTasks(String userId) {
+		List<AppContracts.FamilyTaskResponse> asPatient = familyTaskRepository.findByPatientUserCodeOrderByCreatedAtDesc(userId).stream()
+				.map(this::toTaskResponse)
+				.toList();
+		List<AppContracts.FamilyTaskResponse> asCaregiver = familyTaskRepository.findByCaregiverUserCodeOrderByCreatedAtDesc(userId).stream()
+				.filter(this::hasActiveBinding)
+				.map(this::toTaskResponse)
+				.toList();
+		return new AppContracts.FamilyTasksResponse(asPatient, asCaregiver);
+	}
+
+	@Transactional
+	public AppContracts.FamilyTaskResponse createTask(
+			String currentUserId,
+			String bindingCode,
+			AppContracts.FamilyTaskCreateRequest request
+	) {
+		FamilyBindingEntity binding = familyBindingRepository.findByBindingCode(bindingCode)
+				.orElseThrow(() -> new BusinessException("BINDING_NOT_FOUND", "绑定关系不存在"));
+		if (!Objects.equals(binding.getPatientUserCode(), currentUserId)) {
+			throw new BusinessException("FORBIDDEN", "只有患者本人可以发起家属代办");
+		}
+		requireActiveTaskBinding(binding);
+		Instant now = Instant.now();
+		FamilyTaskEntity task = new FamilyTaskEntity();
+		task.setTaskCode(idGenerator.next("family-task"));
+		task.setBindingCode(binding.getBindingCode());
+		task.setPatientUserCode(binding.getPatientUserCode());
+		task.setCaregiverUserCode(binding.getCaregiverUserCode());
+		task.setRelationType(binding.getRelationType());
+		task.setStatus(STATUS_OPEN);
+		task.setTitle(request.title().trim());
+		task.setDescription(trimToNull(request.description()));
+		task.setCreatedByUserCode(currentUserId);
+		task.setDueAt(request.dueAt());
+		task.setCreatedAt(now);
+		task.setUpdatedAt(now);
+		familyTaskRepository.save(task);
+		return toTaskResponse(task);
+	}
+
+	@Transactional
+	public AppContracts.FamilyTaskResponse completeTask(
+			String currentUserId,
+			String taskCode,
+			AppContracts.FamilyTaskCompleteRequest request
+	) {
+		FamilyTaskEntity task = familyTaskRepository.findByTaskCode(taskCode)
+				.orElseThrow(() -> new BusinessException("FAMILY_TASK_NOT_FOUND", "家属代办不存在"));
+		if (!Objects.equals(task.getCaregiverUserCode(), currentUserId)) {
+			throw new BusinessException("FORBIDDEN", "只有被指派的家属可以确认完成");
+		}
+		FamilyBindingEntity binding = familyBindingRepository.findByBindingCode(task.getBindingCode())
+				.orElseThrow(() -> new BusinessException("BINDING_NOT_FOUND", "绑定关系不存在"));
+		requireActiveTaskBinding(binding);
+		if (!STATUS_OPEN.equals(task.getStatus())) {
+			throw new BusinessException("FAMILY_TASK_COMPLETED", "当前代办已处理，无需重复确认");
+		}
+		task.setStatus(STATUS_COMPLETED);
+		task.setCompletedAt(Instant.now());
+		task.setCompletionNote(trimToNull(request.completionNote()));
+		task.setUpdatedAt(task.getCompletedAt());
+		familyTaskRepository.save(task);
+		return toTaskResponse(task);
 	}
 
 	private void refreshExpiredInvites(String patientUserId) {
@@ -277,6 +393,9 @@ public class FamilyCareService {
 				invite.getRelationType(),
 				invite.getInviteMessage(),
 				invite.getStatus(),
+				invite.getCaregiverPermission(),
+				invite.isWeeklyReportEnabled(),
+				invite.isNotifyOnHighRisk(),
 				invite.getAcceptedByUserCode(),
 				acceptedBy == null ? null : acceptedBy.getNickname(),
 				invite.getExpiresAt(),
@@ -295,8 +414,43 @@ public class FamilyCareService {
 				caregiver.getNickname(),
 				binding.getRelationType(),
 				binding.getStatus(),
+				binding.getCaregiverPermission(),
+				binding.isWeeklyReportEnabled(),
+				binding.isNotifyOnHighRisk(),
 				binding.getCreatedAt()
 		);
+	}
+
+	private AppContracts.FamilyTaskResponse toTaskResponse(FamilyTaskEntity task) {
+		UserAccountEntity patient = requireAccount(task.getPatientUserCode());
+		UserAccountEntity caregiver = requireAccount(task.getCaregiverUserCode());
+		return new AppContracts.FamilyTaskResponse(
+				task.getTaskCode(),
+				task.getBindingCode(),
+				patient.getUserCode(),
+				patient.getNickname(),
+				caregiver.getUserCode(),
+				caregiver.getNickname(),
+				task.getRelationType(),
+				task.getStatus(),
+				task.getTitle(),
+				task.getDescription(),
+				task.getDueAt(),
+				task.getCreatedAt(),
+				task.getCompletedAt(),
+				task.getCompletionNote()
+		);
+	}
+
+	private FamilyBindingEntity requireActiveBinding(String patientUserId, String caregiverUserId) {
+		return familyBindingRepository.findByPatientUserCodeAndCaregiverUserCodeAndStatus(patientUserId, caregiverUserId, STATUS_ACTIVE)
+				.orElseThrow(() -> new BusinessException("FORBIDDEN", "当前没有该患者的有效家属授权"));
+	}
+
+	private boolean hasActiveBinding(FamilyTaskEntity task) {
+		return familyBindingRepository.findByBindingCode(task.getBindingCode())
+				.map(item -> STATUS_ACTIVE.equals(item.getStatus()) && Objects.equals(item.getCaregiverUserCode(), task.getCaregiverUserCode()))
+				.orElse(false);
 	}
 
 	private UserAccountEntity requireAccount(String userId) {
@@ -312,11 +466,47 @@ public class FamilyCareService {
 		return expiresInDays == null ? 7 : expiresInDays;
 	}
 
+	private boolean defaultBoolean(Boolean value, boolean defaultValue) {
+		return value == null ? defaultValue : value;
+	}
+
+	private boolean canReceiveAlerts(FamilyBindingEntity binding) {
+		return PERMISSION_REMINDER.equals(binding.getCaregiverPermission())
+				|| PERMISSION_TASK.equals(binding.getCaregiverPermission());
+	}
+
+	private void requireActiveTaskBinding(FamilyBindingEntity binding) {
+		if (!STATUS_ACTIVE.equals(binding.getStatus())) {
+			throw new BusinessException("BINDING_INACTIVE", "当前绑定关系不可操作家属代办");
+		}
+		if (!PERMISSION_TASK.equals(binding.getCaregiverPermission())) {
+			throw new BusinessException("FAMILY_TASK_PERMISSION_DENIED", "当前绑定关系尚未开放共同照护权限");
+		}
+	}
+
+	private String normalizeCaregiverPermission(String value) {
+		if (!StringUtils.hasText(value)) {
+			return PERMISSION_REMINDER;
+		}
+		String normalized = value.trim().toUpperCase();
+		if (PERMISSION_READ_ONLY.equals(normalized) || PERMISSION_REMINDER.equals(normalized) || PERMISSION_TASK.equals(normalized)) {
+			return normalized;
+		}
+		throw new BusinessException("FAMILY_PERMISSION_INVALID", "不支持的家属权限，请使用 READ_ONLY / REMINDER / TASK。");
+	}
+
 	private int riskRank(AppContracts.RiskLevel riskLevel) {
 		return switch (riskLevel) {
 			case RED -> 3;
 			case YELLOW -> 2;
 			case GREEN -> 1;
 		};
+	}
+
+	private String trimToNull(String value) {
+		if (!StringUtils.hasText(value)) {
+			return null;
+		}
+		return value.trim();
 	}
 }

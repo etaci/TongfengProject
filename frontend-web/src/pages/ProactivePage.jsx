@@ -6,6 +6,80 @@ import { BulletList } from "../components/HealthBlocks";
 import { countryOptions } from "../constants/options";
 import { formatDateTime } from "../utils/format";
 
+function ActionHub({ proactiveBrief, flareReview }) {
+  const mergedActions = [
+    ...(proactiveBrief?.suggestions || []),
+    ...(flareReview?.actionSuggestions || []),
+  ].filter(Boolean);
+
+  const uniqueActions = [...new Set(mergedActions)];
+
+  return (
+    <Card>
+      <div className="card-head">
+        <div>
+          <p className="eyebrow">Action hub</p>
+          <h3>现在就处理</h3>
+        </div>
+      </div>
+      {uniqueActions.length ? (
+        <div className="stack-list">
+          {uniqueActions.slice(0, 5).map((item) => (
+            <article className="list-card" key={item}>
+              <p>{item}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState message="同步数据后，这里会汇总天气、风险因素和发作复盘的建议动作。" />
+      )}
+    </Card>
+  );
+}
+
+function CareSnapshot({ proactiveBrief, flareReview, settings }) {
+  return (
+    <Card>
+      <div className="card-head">
+        <div>
+          <p className="eyebrow">Snapshot</p>
+          <h3>关怀快照</h3>
+        </div>
+      </div>
+      <div className="stats-grid stats-grid--compact">
+        <div className="stat-line">
+          <span>监测城市</span>
+          <strong>{settings?.monitoringCity || "未设置"}</strong>
+        </div>
+        <div className="stat-line">
+          <span>天气提醒</span>
+          <strong>{settings?.weatherAlertsEnabled ? "已开启" : "未开启"}</strong>
+        </div>
+        <div className="stat-line">
+          <span>风险因素</span>
+          <strong>{proactiveBrief?.factors?.length || 0}</strong>
+        </div>
+      </div>
+      <div className="stack-list">
+        <article className="list-card">
+          <div className="result-header">
+            <strong>主动关怀摘要</strong>
+            <RiskBadge level={proactiveBrief?.overallRiskLevel} />
+          </div>
+          <p>{proactiveBrief?.summary || "暂无主动关怀摘要。"}</p>
+        </article>
+        <article className="list-card">
+          <div className="result-header">
+            <strong>发作复盘状态</strong>
+            <RiskBadge level={flareReview?.overallRiskLevel} />
+          </div>
+          <p>{flareReview?.summary || "暂无近期发作复盘。"}</p>
+        </article>
+      </div>
+    </Card>
+  );
+}
+
 export default function ProactivePage({
   data,
   busyMap,
@@ -129,6 +203,11 @@ export default function ProactivePage({
             )}
           </div>
         </Card>
+      </div>
+
+      <div className="overview-grid overview-grid--secondary">
+        <CareSnapshot proactiveBrief={data.proactiveBrief} flareReview={data.flareReview} settings={data.proactiveSettings} />
+        <ActionHub proactiveBrief={data.proactiveBrief} flareReview={data.flareReview} />
       </div>
 
       <Card>

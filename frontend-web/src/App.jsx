@@ -7,10 +7,10 @@ import FamilyPage from "./pages/FamilyPage";
 import OverviewPage from "./pages/OverviewPage";
 import ProactivePage from "./pages/ProactivePage";
 import RecordsPage from "./pages/RecordsPage";
-import { trendOptions } from "./constants/options";
+import { authAccountTypeOptions, familyPermissionOptions, trendOptions } from "./constants/options";
 import useTongfengApp from "./hooks/useTongfengApp";
 import { formatDateTime } from "./utils/format";
-import { emptyToNull, parseMedicationText, splitCsv, toIsoString } from "./utils/forms";
+import { emptyToNull, getMedicationPeriods, parseMedicationText, splitCsv, toIsoString } from "./utils/forms";
 
 function HeroMetrics({ overview }) {
   const metrics = overview
@@ -18,34 +18,34 @@ function HeroMetrics({ overview }) {
         {
           label: "今日重点",
           value: `${overview.todayFocus?.length || 0} 项`,
-          description: overview.todayFocus?.slice(0, 2).join(" / ") || "今天暂无额外提醒",
+          description: overview.todayFocus?.slice(0, 2).join(" / ") || "今天先维持当前节奏",
         },
         {
-          label: "风险阶段",
-          value: overview.stage || "ACTIVE",
-          description: overview.latestRiskSummary || "后端暂未生成风险摘要",
+          label: "当前风险",
+          value: overview.stage || "待评估",
+          description: overview.latestRiskSummary || "登录后会自动生成今天的风险摘要",
         },
         {
-          label: "闭环动作",
+          label: "今日记录",
           value: `${overview.mealsCount || 0} 餐 / ${overview.uricAcidCount || 0} 次尿酸`,
-          description: `高风险餐 ${overview.highRiskMealsCount || 0} 次，发作 ${overview.flareCount || 0} 次`,
+          description: `高风险饮食 ${overview.highRiskMealsCount || 0} 次，发作 ${overview.flareCount || 0} 次`,
         },
       ]
     : [
         {
           label: "今日重点",
           value: "等待登录",
-          description: "登录后自动读取当天的管理建议",
+          description: "登录后直接生成今天的行动建议",
         },
         {
-          label: "风险阶段",
+          label: "当前风险",
           value: "数据未加载",
-          description: "总览、提醒和趋势会在这里汇总",
+          description: "风险分流、提醒和趋势会在这里汇总",
         },
         {
-          label: "闭环动作",
+          label: "今日记录",
           value: "等待同步",
-          description: "当前版本聚焦饮食识别、记录、分析与档案四条主链路",
+          description: "当前版本先聚焦饮食、用药、指标和复盘四件事",
         },
       ];
 
@@ -66,9 +66,35 @@ export default function App() {
   const app = useTongfengApp();
   const { data, busyMap, session } = app;
 
-  const [loginNickname, setLoginNickname] = useState("");
+  const [authMode, setAuthMode] = useState("login");
+  const [loginDraft, setLoginDraft] = useState({
+    accountType: "EMAIL",
+    account: "",
+    password: "",
+  });
+  const [registerDraft, setRegisterDraft] = useState({
+    nickname: "",
+    accountType: "EMAIL",
+    account: "",
+    password: "",
+    confirmPassword: "",
+    consentVersion: "v1.0",
+    privacyPolicyVersion: "privacy-v1.0",
+    privacyAccepted: true,
+    termsAccepted: true,
+    medicalDataAuthorized: true,
+    familyCollaborationAuthorized: true,
+    notificationAuthorized: true,
+  });
+  const [mockNickname, setMockNickname] = useState("");
   const [profileDraft, setProfileDraft] = useState(app.profileForm);
   const [medicationDraft, setMedicationDraft] = useState(app.medicationForm);
+  const [medicationCheckinDraft, setMedicationCheckinDraft] = useState({
+    medicationName: "",
+    scheduledPeriod: "MORNING",
+    status: "TAKEN",
+    note: "",
+  });
   const [proactiveDraft, setProactiveDraft] = useState({
     monitoringCity: "",
     countryCode: "CN",
@@ -78,6 +104,15 @@ export default function App() {
     relationType: "SPOUSE",
     inviteMessage: "",
     expiresInDays: "7",
+    caregiverPermission: familyPermissionOptions[1].value,
+    weeklyReportEnabled: true,
+    notifyOnHighRisk: true,
+  });
+  const [familyTaskDraft, setFamilyTaskDraft] = useState({
+    bindingCode: "",
+    title: "",
+    description: "",
+    dueAt: "",
   });
   const [acceptInviteCode, setAcceptInviteCode] = useState("");
   const [deviceDraft, setDeviceDraft] = useState({
@@ -115,6 +150,37 @@ export default function App() {
   }, [app.medicationForm]);
 
   useEffect(() => {
+    const medications = data.medication?.currentMedications || [];
+
+    if (!medications.length) {
+      setMedicationCheckinDraft((current) => (
+        current.medicationName || current.scheduledPeriod !== "MORNING"
+          ? { ...current, medicationName: "", scheduledPeriod: "MORNING" }
+          : current
+      ));
+      return;
+    }
+
+    const selectedMedication = medications.find((item) => item.name === medicationCheckinDraft.medicationName) || medications[0];
+    const periods = getMedicationPeriods(selectedMedication.frequency);
+    const nextPeriod = periods.includes(medicationCheckinDraft.scheduledPeriod)
+      ? medicationCheckinDraft.scheduledPeriod
+      : periods[0];
+
+    setMedicationCheckinDraft((current) => {
+      if (current.medicationName === selectedMedication.name && current.scheduledPeriod === nextPeriod) {
+        return current;
+      }
+
+      return {
+        ...current,
+        medicationName: selectedMedication.name,
+        scheduledPeriod: nextPeriod,
+      };
+    });
+  }, [data.medication, medicationCheckinDraft.medicationName, medicationCheckinDraft.scheduledPeriod]);
+
+  useEffect(() => {
     if (data.proactiveSettings) {
       setProactiveDraft({
         monitoringCity: data.proactiveSettings.monitoringCity || "",
@@ -126,10 +192,10 @@ export default function App() {
 
   useEffect(() => {
     if (!session) {
-      setLoginNickname("");
+      setMockNickname("");
       return;
     }
-    setLoginNickname(session.nickname || "");
+    setMockNickname(session.nickname || "");
   }, [session]);
 
   useEffect(() => {
@@ -154,19 +220,43 @@ export default function App() {
     setRecordEditDraft(nextDraft);
   }, [data.recordDetail]);
 
+  useEffect(() => {
+    const taskBindings = (data.familyMembers?.asPatient || []).filter((item) => item.caregiverPermission === "TASK" && item.status === "ACTIVE");
+    if (!taskBindings.length) {
+      setFamilyTaskDraft((current) => (current.bindingCode ? { ...current, bindingCode: "" } : current));
+      return;
+    }
+
+    if (taskBindings.some((item) => item.bindingCode === familyTaskDraft.bindingCode)) {
+      return;
+    }
+
+    setFamilyTaskDraft((current) => ({ ...current, bindingCode: taskBindings[0].bindingCode }));
+  }, [data.familyMembers, familyTaskDraft.bindingCode]);
+
   const familySummaryTargetName = useMemo(() => data.familyPatientSummary?.patientNickname || "", [data.familyPatientSummary]);
+  const familyWeeklyReportTargetName = useMemo(() => data.familyWeeklyReport?.patientNickname || "", [data.familyWeeklyReport]);
   const familyFeatureEnabled = useMemo(
     () => (data.capabilities?.features || []).some((item) => item.featureKey === "family-care" && item.enabled),
     [data.capabilities],
   );
   const navItems = useMemo(
-    () => [
-      { to: "/overview", label: "总览" },
-      { to: "/records", label: "记录" },
-      { to: "/analysis", label: "分析" },
-      { to: "/assistant", label: "问答与档案" },
-    ],
-    [],
+    () => {
+      const items = [
+        { to: "/overview", label: "总览" },
+        { to: "/records", label: "记录" },
+        { to: "/analysis", label: "分析" },
+        { to: "/proactive", label: "主动关怀" },
+      ];
+
+      if (familyFeatureEnabled) {
+        items.push({ to: "/family", label: "家庭协同" });
+      }
+
+      items.push({ to: "/assistant", label: "问答与档案" });
+      return items;
+    },
+    [familyFeatureEnabled],
   );
 
   async function withErrorHandling(task) {
@@ -181,16 +271,74 @@ export default function App() {
     return keys(formData);
   }
 
-  async function handleLogin(event) {
+  async function handlePasswordLogin(event) {
     event.preventDefault();
-    const nickname = loginNickname.trim();
-
-    if (!nickname) {
-      app.setBanner({ tone: "warning", message: "请输入昵称后再登录。" });
+    if (!loginDraft.account.trim() || !loginDraft.password.trim()) {
+      app.setBanner({ tone: "warning", message: "请先填写完整的账号和密码。" });
       return;
     }
 
-    await withErrorHandling(() => app.login(nickname));
+    await withErrorHandling(() => app.login({
+      accountType: loginDraft.accountType,
+      account: loginDraft.account.trim(),
+      password: loginDraft.password,
+    }));
+  }
+
+  async function handleRegister(event) {
+    event.preventDefault();
+    if (!registerDraft.nickname.trim() || !registerDraft.account.trim()) {
+      app.setBanner({ tone: "warning", message: "请先填写昵称和账号。" });
+      return;
+    }
+
+    if (!registerDraft.password.trim() || !registerDraft.confirmPassword.trim()) {
+      app.setBanner({ tone: "warning", message: "请先填写并确认密码。" });
+      return;
+    }
+
+    await withErrorHandling(() => app.register({
+      nickname: registerDraft.nickname.trim(),
+      accountType: registerDraft.accountType,
+      account: registerDraft.account.trim(),
+      password: registerDraft.password,
+      confirmPassword: registerDraft.confirmPassword,
+      consent: {
+        consentVersion: registerDraft.consentVersion,
+        privacyPolicyVersion: registerDraft.privacyPolicyVersion,
+        privacyAccepted: registerDraft.privacyAccepted,
+        termsAccepted: registerDraft.termsAccepted,
+        medicalDataAuthorized: registerDraft.medicalDataAuthorized,
+        familyCollaborationAuthorized: registerDraft.familyCollaborationAuthorized,
+        notificationAuthorized: registerDraft.notificationAuthorized,
+      },
+    }));
+  }
+
+  async function handleMockLogin(event) {
+    event.preventDefault();
+    const nickname = mockNickname.trim();
+
+    if (!nickname) {
+      app.setBanner({ tone: "warning", message: "请输入昵称后再进入开发体验环境。" });
+      return;
+    }
+
+    await withErrorHandling(() => app.loginDemo(nickname));
+  }
+
+  async function handlePasswordChange(payload) {
+    try {
+      await app.submitPasswordChange(payload);
+      return true;
+    } catch (error) {
+      app.setBanner({ tone: "danger", message: error.message });
+      return false;
+    }
+  }
+
+  async function handleRevokeSession(sessionCode) {
+    await withErrorHandling(() => app.revokeAuthSession(sessionCode));
   }
 
   async function handleRefresh() {
@@ -221,6 +369,25 @@ export default function App() {
         followUpNote: emptyToNull(medicationDraft.followUpNote),
       }),
     );
+  }
+
+  async function handleMedicationCheckinSubmit(event) {
+    event.preventDefault();
+
+    if (!medicationCheckinDraft.medicationName) {
+      app.setBanner({ tone: "warning", message: "请先补齐用药计划，再进行用药打卡。" });
+      return;
+    }
+
+    await withErrorHandling(async () => {
+      await app.submitMedicationCheckin({
+        medicationName: medicationCheckinDraft.medicationName,
+        scheduledPeriod: medicationCheckinDraft.scheduledPeriod,
+        status: medicationCheckinDraft.status,
+        note: emptyToNull(medicationCheckinDraft.note),
+      });
+      setMedicationCheckinDraft((current) => ({ ...current, status: "TAKEN", note: "" }));
+    });
   }
 
   async function handleRecordSubmit(event, busyKey, path, successMessage, mapper) {
@@ -320,8 +487,15 @@ export default function App() {
         relationType: inviteDraft.relationType,
         inviteMessage: emptyToNull(inviteDraft.inviteMessage),
         expiresInDays: Number(inviteDraft.expiresInDays),
+        caregiverPermission: inviteDraft.caregiverPermission,
+        weeklyReportEnabled: inviteDraft.weeklyReportEnabled,
+        notifyOnHighRisk: inviteDraft.notifyOnHighRisk,
       }),
     );
+  }
+
+  async function handlePrivacyConsentSubmit(payload) {
+    await withErrorHandling(() => app.submitPrivacyConsent(payload));
   }
 
   async function handleAcceptInvite(event) {
@@ -335,6 +509,34 @@ export default function App() {
     await withErrorHandling(async () => {
       await app.acceptInvite(inviteCode);
       setAcceptInviteCode("");
+    });
+  }
+
+  async function handleFamilyTaskSubmit(event) {
+    event.preventDefault();
+
+    if (!familyTaskDraft.bindingCode) {
+      app.setBanner({ tone: "warning", message: "请先选择具备共同照护权限的家属成员。" });
+      return;
+    }
+
+    if (!familyTaskDraft.title.trim()) {
+      app.setBanner({ tone: "warning", message: "请输入代办标题后再创建。" });
+      return;
+    }
+
+    await withErrorHandling(async () => {
+      await app.submitFamilyTask(familyTaskDraft.bindingCode, {
+        title: familyTaskDraft.title.trim(),
+        description: emptyToNull(familyTaskDraft.description),
+        dueAt: familyTaskDraft.dueAt ? toIsoString(familyTaskDraft.dueAt) : null,
+      });
+      setFamilyTaskDraft((current) => ({
+        ...current,
+        title: "",
+        description: "",
+        dueAt: "",
+      }));
     });
   }
 
@@ -571,37 +773,169 @@ export default function App() {
       <main id="top">
         <section className="hero-section">
           <div className="hero-copy">
-            <p className="section-kicker">Zapier-inspired responsive dashboard</p>
-            <h1>把每日指标、饮食风险、家庭协同与设备数据，放进一个可持续扩展的动态 Web 端里。</h1>
+            <p className="section-kicker">痛风主动管理</p>
+            <h1>先告诉患者今天该做什么，而不是先展示一块研发味很重的仪表盘。</h1>
             <p className="hero-copy__lead">
-              这个版本继续沿用暖色背景、卡片承重和橙色聚焦的设计语言，并把当前 MVP 主链路收敛到记录、趋势、原因分析、OCR 与家属轻协同几个核心面板中。
+              这一版把首页改成“今日行动页”，优先交付风险分流、行动清单和 AI 使用边界，让患者先完成关键任务，再查看趋势、档案和分析细节。
             </p>
             <HeroMetrics overview={data.overview} />
           </div>
 
           <aside className="hero-panel">
             <div className="panel-head">
-              <p className="section-kicker">Mock login</p>
-              <h2>快速进入体验环境</h2>
+              <p className="section-kicker">真实登录与授权</p>
+              <h2>先完成正式登录，再进入今天的主动管理任务流</h2>
             </div>
-            <form className="stack-form" onSubmit={handleLogin}>
-              <label>
-                <span>昵称</span>
-                <input value={loginNickname} onChange={(event) => setLoginNickname(event.target.value)} placeholder="例如：张三" />
-              </label>
-              <button className="primary-button" type="submit" disabled={busyMap.login}>
-                {busyMap.login ? "登录中..." : "立即登录并拉取数据"}
+            <div className="action-row">
+              <button className={authMode === "login" ? "pill-button" : "ghost-button"} type="button" onClick={() => setAuthMode("login")}>
+                账号登录
               </button>
-            </form>
+              <button className={authMode === "register" ? "pill-button" : "ghost-button"} type="button" onClick={() => setAuthMode("register")}>
+                新用户注册
+              </button>
+            </div>
+            {authMode === "login" ? (
+              <form className="stack-form" onSubmit={handlePasswordLogin}>
+                <label>
+                  <span>账号类型</span>
+                  <select value={loginDraft.accountType} onChange={(event) => setLoginDraft((current) => ({ ...current, accountType: event.target.value }))}>
+                    {authAccountTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>账号</span>
+                  <input
+                    value={loginDraft.account}
+                    onChange={(event) => setLoginDraft((current) => ({ ...current, account: event.target.value }))}
+                    placeholder={loginDraft.accountType === "EMAIL" ? "例如：zhangsan@example.com" : "例如：13800138000"}
+                  />
+                </label>
+                <label>
+                  <span>密码</span>
+                  <input
+                    type="password"
+                    value={loginDraft.password}
+                    onChange={(event) => setLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                    placeholder="至少 8 位"
+                  />
+                </label>
+                <button className="primary-button" type="submit" disabled={busyMap.login}>
+                  {busyMap.login ? "登录中..." : "登录并进入"}
+                </button>
+              </form>
+            ) : (
+              <form className="stack-form" onSubmit={handleRegister}>
+                <label>
+                  <span>昵称</span>
+                  <input value={registerDraft.nickname} onChange={(event) => setRegisterDraft((current) => ({ ...current, nickname: event.target.value }))} />
+                </label>
+                <label>
+                  <span>账号类型</span>
+                  <select value={registerDraft.accountType} onChange={(event) => setRegisterDraft((current) => ({ ...current, accountType: event.target.value }))}>
+                    {authAccountTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>账号</span>
+                  <input
+                    value={registerDraft.account}
+                    onChange={(event) => setRegisterDraft((current) => ({ ...current, account: event.target.value }))}
+                    placeholder={registerDraft.accountType === "EMAIL" ? "例如：zhangsan@example.com" : "例如：13800138000"}
+                  />
+                </label>
+                <label>
+                  <span>密码</span>
+                  <input
+                    type="password"
+                    value={registerDraft.password}
+                    onChange={(event) => setRegisterDraft((current) => ({ ...current, password: event.target.value }))}
+                    placeholder="至少 8 位"
+                  />
+                </label>
+                <label>
+                  <span>确认密码</span>
+                  <input
+                    type="password"
+                    value={registerDraft.confirmPassword}
+                    onChange={(event) => setRegisterDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                  />
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={registerDraft.privacyAccepted}
+                    onChange={(event) => setRegisterDraft((current) => ({ ...current, privacyAccepted: event.target.checked }))}
+                  />
+                  <span>我已阅读并同意隐私政策</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={registerDraft.termsAccepted}
+                    onChange={(event) => setRegisterDraft((current) => ({ ...current, termsAccepted: event.target.checked }))}
+                  />
+                  <span>我已阅读并同意服务条款</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={registerDraft.medicalDataAuthorized}
+                    onChange={(event) => setRegisterDraft((current) => ({ ...current, medicalDataAuthorized: event.target.checked }))}
+                  />
+                  <span>同意平台使用健康数据生成主动管理建议</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={registerDraft.familyCollaborationAuthorized}
+                    onChange={(event) => setRegisterDraft((current) => ({ ...current, familyCollaborationAuthorized: event.target.checked }))}
+                  />
+                  <span>同意后续启用家庭协同授权能力</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={registerDraft.notificationAuthorized}
+                    onChange={(event) => setRegisterDraft((current) => ({ ...current, notificationAuthorized: event.target.checked }))}
+                  />
+                  <span>同意接收随访与风险提醒通知</span>
+                </label>
+                <button className="primary-button" type="submit" disabled={busyMap.register}>
+                  {busyMap.register ? "注册中..." : "注册并进入"}
+                </button>
+              </form>
+            )}
+            <div className="session-card">
+              <strong>开发体验入口</strong>
+              <form className="stack-form compact-form" onSubmit={handleMockLogin}>
+                <label>
+                  <span>Mock 昵称</span>
+                  <input value={mockNickname} onChange={(event) => setMockNickname(event.target.value)} placeholder="例如：开发联调用户" />
+                </label>
+                <button className="ghost-button" type="submit" disabled={busyMap.mockLogin}>
+                  {busyMap.mockLogin ? "进入中..." : "进入开发体验环境"}
+                </button>
+              </form>
+            </div>
             <div className="session-card">
               {session ? (
                 <>
                   <strong>{session.nickname}</strong>
                   <p>用户 ID：{session.userId}</p>
+                  <p>登录方式：{session.authMode || "UNKNOWN"} / {session.accountType || "DEMO"}</p>
+                  <p>账号标识：{session.accountIdentifier || "开发体验账号"}</p>
                   <p>过期时间：{formatDateTime(session.expiresAt)}</p>
                 </>
               ) : (
-                <p>当前尚未建立会话。</p>
+                <p>当前优先展示真实登录骨架，同时保留 mock 入口用于本地联调。</p>
               )}
             </div>
             <StatusBanner tone={app.banner.tone} message={app.banner.message} />
@@ -610,7 +944,7 @@ export default function App() {
 
         <Routes>
           <Route path="/" element={<Navigate to="/overview" replace />} />
-          <Route path="/overview" element={<OverviewPage app={app} data={data} trendOptions={trendOptions} />} />
+          <Route path="/overview" element={<OverviewPage app={app} data={data} trendOptions={trendOptions} familyFeatureEnabled={familyFeatureEnabled} />} />
           <Route
             path="/records"
             element={(
@@ -662,10 +996,14 @@ export default function App() {
                 inviteDraft={inviteDraft}
                 setInviteDraft={setInviteDraft}
                 handleInviteSubmit={handleInviteSubmit}
+                familyTaskDraft={familyTaskDraft}
+                setFamilyTaskDraft={setFamilyTaskDraft}
+                handleFamilyTaskSubmit={handleFamilyTaskSubmit}
                 acceptInviteCode={acceptInviteCode}
                 setAcceptInviteCode={setAcceptInviteCode}
                 handleAcceptInvite={handleAcceptInvite}
                 familySummaryTargetName={familySummaryTargetName}
+                familyWeeklyReportTargetName={familyWeeklyReportTargetName}
                 withErrorHandling={withErrorHandling}
               />
             ) : <Navigate to="/overview" replace />}
@@ -684,9 +1022,15 @@ export default function App() {
                 profileDraft={profileDraft}
                 setProfileDraft={setProfileDraft}
                 handleProfileSubmit={handleProfileSubmit}
+                handlePrivacyConsentSubmit={handlePrivacyConsentSubmit}
+                handlePasswordChange={handlePasswordChange}
+                handleRevokeSession={handleRevokeSession}
                 medicationDraft={medicationDraft}
                 setMedicationDraft={setMedicationDraft}
                 handleMedicationSubmit={handleMedicationSubmit}
+                medicationCheckinDraft={medicationCheckinDraft}
+                setMedicationCheckinDraft={setMedicationCheckinDraft}
+                handleMedicationCheckinSubmit={handleMedicationCheckinSubmit}
                 handleFileUpload={handleFileUpload}
                 handleOpenFile={handleOpenFile}
                 handleLabSubmit={handleLabSubmit}
@@ -698,6 +1042,7 @@ export default function App() {
                 setAcceptInviteCode={setAcceptInviteCode}
                 handleAcceptInvite={handleAcceptInvite}
                 familySummaryTargetName={familySummaryTargetName}
+                familyWeeklyReportTargetName={familyWeeklyReportTargetName}
                 withErrorHandling={withErrorHandling}
               />
             )}

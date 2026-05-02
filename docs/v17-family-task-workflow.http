@@ -1,0 +1,86 @@
+### 患者登录
+POST http://localhost:8080/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "patient-v17"
+}
+
+> {%
+client.global.set("patient_token", response.body.data.token);
+client.global.set("patient_user_id", response.body.data.userId);
+%}
+
+### 家属登录
+POST http://localhost:8080/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "caregiver-v17"
+}
+
+> {%
+client.global.set("caregiver_token", response.body.data.token);
+%}
+
+### 发起邀请（共同照护权限）
+POST http://localhost:8080/api/v1/family/invitations
+Authorization: Bearer {{patient_token}}
+Content-Type: application/json
+
+{
+  "relationType": "SPOUSE",
+  "inviteMessage": "一起处理补药和日常代办",
+  "expiresInDays": 7,
+  "caregiverPermission": "TASK",
+  "weeklyReportEnabled": true,
+  "notifyOnHighRisk": true
+}
+
+> {%
+client.global.set("invite_code", response.body.data.inviteCode);
+%}
+
+### 家属接受邀请
+POST http://localhost:8080/api/v1/family/invitations/{{invite_code}}/accept
+Authorization: Bearer {{caregiver_token}}
+
+### 患者查看成员并提取 bindingCode
+GET http://localhost:8080/api/v1/family/members
+Authorization: Bearer {{patient_token}}
+
+> {%
+client.global.set("binding_code", response.body.data.asPatient[0].bindingCode);
+%}
+
+### 患者创建家属代办
+POST http://localhost:8080/api/v1/family/members/{{binding_code}}/tasks
+Authorization: Bearer {{patient_token}}
+Content-Type: application/json
+
+{
+  "title": "周一上午帮我确认补药",
+  "description": "如果剩余药量不足 2 天，请提醒我当天处理。",
+  "dueAt": "2026-05-04T09:00:00Z"
+}
+
+> {%
+client.global.set("task_code", response.body.data.taskCode);
+%}
+
+### 家属查看自己的代办
+GET http://localhost:8080/api/v1/family/tasks
+Authorization: Bearer {{caregiver_token}}
+
+### 家属确认代办完成
+POST http://localhost:8080/api/v1/family/tasks/{{task_code}}/complete
+Authorization: Bearer {{caregiver_token}}
+Content-Type: application/json
+
+{
+  "completionNote": "已确认库存，明早可以去药房补药。"
+}
+
+### 患者回看代办状态
+GET http://localhost:8080/api/v1/family/tasks
+Authorization: Bearer {{patient_token}}

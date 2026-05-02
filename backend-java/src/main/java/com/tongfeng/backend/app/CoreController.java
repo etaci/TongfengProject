@@ -237,6 +237,13 @@ public class CoreController {
 		return ApiResponse.success(healthAssistantService.getOverview(userId));
 	}
 
+	@GetMapping("/api/v1/home/today")
+	public ApiResponse<AppContracts.TodayActionPlanResponse> getTodayActionPlan(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
+	) {
+		return ApiResponse.success(healthAssistantService.getTodayActionPlan(userId));
+	}
+
 	@GetMapping("/api/v1/mvp/metrics/summary")
 	public ApiResponse<AppContracts.MvpMetricsSummaryResponse> getMvpMetricsSummary(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
@@ -302,6 +309,14 @@ public class CoreController {
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
 		return ApiResponse.success(healthAssistantService.listLabReports(userId));
+	}
+
+	@GetMapping("/api/v1/lab-reports/{reportId}/review")
+	public ApiResponse<AppContracts.LabReportReviewResponse> getLabReportReview(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@PathVariable String reportId
+	) {
+		return ApiResponse.success(healthAssistantService.getLabReportReview(userId, reportId));
 	}
 
 	@PostMapping("/api/v1/knowledge/ask")
@@ -404,12 +419,50 @@ public class CoreController {
 		return ApiResponse.success(healthAssistantService.removeFamilyBinding(userId, bindingCode));
 	}
 
+	@PutMapping("/api/v1/family/members/{bindingCode}/permissions")
+	public ApiResponse<AppContracts.FamilyBindingMemberResponse> updateFamilyBindingPermissions(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@PathVariable String bindingCode,
+			@Valid @RequestBody AppContracts.FamilyBindingPermissionUpdateRequest request
+	) {
+		featureAccessService.ensureFamilyEnabled();
+		return ApiResponse.success(healthAssistantService.updateFamilyBindingPermissions(userId, bindingCode, request));
+	}
+
 	@GetMapping("/api/v1/family/alerts")
 	public ApiResponse<List<AppContracts.FamilyAlertResponse>> getFamilyAlerts(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
 		featureAccessService.ensureFamilyEnabled();
 		return ApiResponse.success(healthAssistantService.getFamilyAlerts(userId));
+	}
+
+	@GetMapping("/api/v1/family/tasks")
+	public ApiResponse<AppContracts.FamilyTasksResponse> getFamilyTasks(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
+	) {
+		featureAccessService.ensureFamilyEnabled();
+		return ApiResponse.success(healthAssistantService.getFamilyTasks(userId));
+	}
+
+	@PostMapping("/api/v1/family/members/{bindingCode}/tasks")
+	public ApiResponse<AppContracts.FamilyTaskResponse> createFamilyTask(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@PathVariable String bindingCode,
+			@Valid @RequestBody AppContracts.FamilyTaskCreateRequest request
+	) {
+		featureAccessService.ensureFamilyEnabled();
+		return ApiResponse.success(healthAssistantService.createFamilyTask(userId, bindingCode, request));
+	}
+
+	@PostMapping("/api/v1/family/tasks/{taskCode}/complete")
+	public ApiResponse<AppContracts.FamilyTaskResponse> completeFamilyTask(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@PathVariable String taskCode,
+			@Valid @RequestBody AppContracts.FamilyTaskCompleteRequest request
+	) {
+		featureAccessService.ensureFamilyEnabled();
+		return ApiResponse.success(healthAssistantService.completeFamilyTask(userId, taskCode, request));
 	}
 
 	@GetMapping("/api/v1/family/patients/{patientUserId}/summary")
@@ -421,11 +474,46 @@ public class CoreController {
 		return ApiResponse.success(healthAssistantService.getFamilyPatientSummary(userId, patientUserId));
 	}
 
+	@GetMapping("/api/v1/family/patients/{patientUserId}/weekly-report")
+	public ApiResponse<AppContracts.FamilySharedMedicationWeeklyReportResponse> getFamilySharedMedicationWeeklyReport(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@PathVariable String patientUserId,
+			@RequestParam(defaultValue = "7")
+			@Min(value = 1, message = "days 不能小于1")
+			@Max(value = 30, message = "days 不能大于30")
+			int days
+	) {
+		featureAccessService.ensureFamilyEnabled();
+		return ApiResponse.success(healthAssistantService.getFamilySharedMedicationWeeklyReport(userId, patientUserId, days));
+	}
+
 	@GetMapping("/api/v1/medications")
 	public ApiResponse<AppContracts.MedicationPlanResponse> getMedicationPlan(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
 		return ApiResponse.success(healthAssistantService.getMedicationPlan(userId));
+	}
+
+	@GetMapping("/api/v1/medications/adherence")
+	public ApiResponse<AppContracts.MedicationAdherenceSummaryResponse> getMedicationAdherence(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestParam(defaultValue = "7")
+			@Min(value = 1, message = "days 涓嶈兘灏忎簬1")
+			@Max(value = 30, message = "days 涓嶈兘澶т簬30")
+			int days
+	) {
+		return ApiResponse.success(healthAssistantService.getMedicationAdherence(userId, days));
+	}
+
+	@GetMapping("/api/v1/medications/weekly-report")
+	public ApiResponse<AppContracts.MedicationWeeklyReportResponse> getMedicationWeeklyReport(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestParam(defaultValue = "7")
+			@Min(value = 1, message = "days 不能小于1")
+			@Max(value = 30, message = "days 不能大于30")
+			int days
+	) {
+		return ApiResponse.success(healthAssistantService.getMedicationWeeklyReport(userId, days));
 	}
 
 	@PutMapping("/api/v1/medications")
@@ -434,5 +522,13 @@ public class CoreController {
 			@Valid @RequestBody AppContracts.MedicationPlanRequest request
 	) {
 		return ApiResponse.success(healthAssistantService.updateMedicationPlan(userId, request));
+	}
+
+	@PostMapping("/api/v1/medications/check-ins")
+	public ApiResponse<AppContracts.MedicationCheckinResponse> submitMedicationCheckin(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@Valid @RequestBody AppContracts.MedicationCheckinRequest request
+	) {
+		return ApiResponse.success(healthAssistantService.submitMedicationCheckin(userId, request));
 	}
 }

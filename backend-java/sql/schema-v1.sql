@@ -25,11 +25,51 @@ CREATE TABLE auth_session (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_code VARCHAR(64) NOT NULL,
     nickname VARCHAR(64) NOT NULL,
+    session_code VARCHAR(64) NOT NULL UNIQUE,
+    auth_mode VARCHAR(32) NOT NULL,
+    account_type VARCHAR(32) NULL,
+    account_identifier VARCHAR(128) NULL,
+    privacy_consent_completed BIT NOT NULL,
     token VARCHAR(128) NOT NULL UNIQUE,
     expires_at DATETIME NOT NULL,
     created_at DATETIME NOT NULL,
+    last_seen_at DATETIME NOT NULL,
+    KEY idx_auth_session_code (session_code),
     KEY idx_auth_session_user_code (user_code),
     KEY idx_auth_session_token (token)
+);
+
+CREATE TABLE auth_identity (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    identity_code VARCHAR(64) NOT NULL UNIQUE,
+    user_code VARCHAR(64) NOT NULL,
+    account_type VARCHAR(32) NOT NULL,
+    principal_value VARCHAR(128) NOT NULL,
+    password_hash VARCHAR(256) NOT NULL,
+    password_salt VARCHAR(128) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    last_login_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    KEY idx_auth_identity_user_code (user_code),
+    KEY idx_auth_identity_principal_status (principal_value, status)
+);
+
+CREATE TABLE privacy_consent_record (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    consent_code VARCHAR(64) NOT NULL UNIQUE,
+    user_code VARCHAR(64) NOT NULL,
+    consent_version VARCHAR(32) NOT NULL,
+    privacy_policy_version VARCHAR(32) NOT NULL,
+    privacy_accepted BIT NOT NULL,
+    terms_accepted BIT NOT NULL,
+    medical_data_authorized BIT NOT NULL,
+    family_collaboration_authorized BIT NOT NULL,
+    notification_authorized BIT NOT NULL,
+    source_type VARCHAR(32) NOT NULL,
+    effective_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL,
+    KEY idx_privacy_consent_user_effective (user_code, effective_at)
 );
 
 CREATE TABLE stored_file (
@@ -143,6 +183,21 @@ CREATE TABLE medication_plan (
     updated_at DATETIME NOT NULL
 );
 
+CREATE TABLE medication_checkin (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    checkin_code VARCHAR(64) NOT NULL UNIQUE,
+    user_code VARCHAR(64) NOT NULL,
+    medication_name VARCHAR(128) NOT NULL,
+    scheduled_period VARCHAR(32) NOT NULL,
+    checkin_status VARCHAR(32) NOT NULL,
+    note_text VARCHAR(500) NULL,
+    checkin_date DATE NOT NULL,
+    checkin_at DATETIME NOT NULL,
+    source_type VARCHAR(32) NOT NULL,
+    KEY idx_medication_checkin_user_date (user_code, checkin_date),
+    UNIQUE KEY uk_medication_checkin_daily_slot (user_code, checkin_date, medication_name, scheduled_period)
+);
+
 CREATE TABLE reminder_event (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     reminder_code VARCHAR(64) NOT NULL UNIQUE,
@@ -226,6 +281,9 @@ CREATE TABLE family_invite (
     relation_type VARCHAR(32) NOT NULL,
     invite_message VARCHAR(200) NULL,
     status VARCHAR(32) NOT NULL,
+    caregiver_permission VARCHAR(32) NOT NULL,
+    weekly_report_enabled BIT NOT NULL,
+    notify_on_high_risk BIT NOT NULL,
     accepted_by_user_code VARCHAR(64) NULL,
     expires_at DATETIME NOT NULL,
     created_at DATETIME NOT NULL,
@@ -241,11 +299,35 @@ CREATE TABLE family_binding (
     caregiver_user_code VARCHAR(64) NOT NULL,
     relation_type VARCHAR(32) NOT NULL,
     status VARCHAR(32) NOT NULL,
+    caregiver_permission VARCHAR(32) NOT NULL,
+    weekly_report_enabled BIT NOT NULL,
+    notify_on_high_risk BIT NOT NULL,
     source_invite_code VARCHAR(64) NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     KEY idx_family_binding_patient_status (patient_user_code, status),
     KEY idx_family_binding_caregiver_status (caregiver_user_code, status)
+);
+
+CREATE TABLE family_task (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_code VARCHAR(64) NOT NULL UNIQUE,
+    binding_code VARCHAR(64) NOT NULL,
+    patient_user_code VARCHAR(64) NOT NULL,
+    caregiver_user_code VARCHAR(64) NOT NULL,
+    relation_type VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    title VARCHAR(128) NOT NULL,
+    description VARCHAR(500) NULL,
+    created_by_user_code VARCHAR(64) NULL,
+    due_at DATETIME NULL,
+    completed_at DATETIME NULL,
+    completion_note VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    KEY idx_family_task_patient_created (patient_user_code, created_at),
+    KEY idx_family_task_caregiver_created (caregiver_user_code, created_at),
+    KEY idx_family_task_binding_status (binding_code, status)
 );
 
 CREATE TABLE device_binding (

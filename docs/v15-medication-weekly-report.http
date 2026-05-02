@@ -1,0 +1,58 @@
+### 演示登录
+POST http://localhost:8080/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "v15-demo"
+}
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 更新用药计划（带补药提醒字段）
+PUT http://localhost:8080/api/v1/medications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "currentMedications": [
+    {
+      "name": "allopurinol",
+      "dosage": "100mg",
+      "frequency": "once-daily",
+      "remark": "after breakfast",
+      "remainingDays": 2,
+      "refillThresholdDays": 3
+    },
+    {
+      "name": "colchicine",
+      "dosage": "0.5mg",
+      "frequency": "twice-daily",
+      "remark": "short-term prevention",
+      "remainingDays": 6,
+      "refillThresholdDays": 3
+    }
+  ],
+  "followUpNote": "bring weekly adherence report to next follow-up"
+}
+
+### 提交一次用药打卡
+POST http://localhost:8080/api/v1/medications/check-ins
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "medicationName": "allopurinol",
+  "scheduledPeriod": "MORNING",
+  "status": "TAKEN",
+  "note": "after breakfast"
+}
+
+### 查看周报
+GET http://localhost:8080/api/v1/medications/weekly-report?days=7
+Authorization: Bearer {{token}}
+
+### 查看提醒流中的补药提醒
+GET http://localhost:8080/api/v1/reminders
+Authorization: Bearer {{token}}

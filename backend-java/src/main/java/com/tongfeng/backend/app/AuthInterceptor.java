@@ -10,6 +10,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class AuthInterceptor implements HandlerInterceptor {
 
 	public static final String CURRENT_USER_ID = "currentUserId";
+	public static final String CURRENT_TOKEN = "currentToken";
 	private final HealthAssistantService healthAssistantService;
 
 	public AuthInterceptor(HealthAssistantService healthAssistantService) {
@@ -25,6 +26,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 		String token = authHeader.substring("Bearer ".length()).trim();
 		UserSession session = healthAssistantService.requireSession(token);
 		request.setAttribute(CURRENT_USER_ID, session.userId());
+		request.setAttribute(CURRENT_TOKEN, session.token());
 		return true;
 	}
 }

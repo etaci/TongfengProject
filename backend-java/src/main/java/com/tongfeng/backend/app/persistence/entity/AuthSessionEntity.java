@@ -11,6 +11,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "auth_session", indexes = {
+		@Index(name = "idx_auth_session_code", columnList = "sessionCode", unique = true),
 		@Index(name = "idx_auth_session_token", columnList = "token", unique = true),
 		@Index(name = "idx_auth_session_user_code", columnList = "userCode")
 })
@@ -26,6 +27,21 @@ public class AuthSessionEntity {
 	@Column(nullable = false, length = 64)
 	private String nickname;
 
+	@Column(nullable = false, length = 64, unique = true)
+	private String sessionCode;
+
+	@Column(nullable = false, length = 32)
+	private String authMode;
+
+	@Column(length = 32)
+	private String accountType;
+
+	@Column(length = 128)
+	private String accountIdentifier;
+
+	@Column(nullable = false)
+	private boolean privacyConsentCompleted;
+
 	@Column(nullable = false, length = 128, unique = true)
 	private String token;
 
@@ -34,6 +50,9 @@ public class AuthSessionEntity {
 
 	@Column(nullable = false)
 	private Instant createdAt;
+
+	@Column(nullable = false)
+	private Instant lastSeenAt;
 
 	public Long getId() {
 		return id;
@@ -53,6 +72,46 @@ public class AuthSessionEntity {
 
 	public void setNickname(String nickname) {
 		this.nickname = nickname;
+	}
+
+	public String getSessionCode() {
+		return sessionCode;
+	}
+
+	public void setSessionCode(String sessionCode) {
+		this.sessionCode = sessionCode;
+	}
+
+	public String getAuthMode() {
+		return authMode;
+	}
+
+	public void setAuthMode(String authMode) {
+		this.authMode = authMode;
+	}
+
+	public String getAccountType() {
+		return accountType;
+	}
+
+	public void setAccountType(String accountType) {
+		this.accountType = accountType;
+	}
+
+	public String getAccountIdentifier() {
+		return accountIdentifier;
+	}
+
+	public void setAccountIdentifier(String accountIdentifier) {
+		this.accountIdentifier = accountIdentifier;
+	}
+
+	public boolean isPrivacyConsentCompleted() {
+		return privacyConsentCompleted;
+	}
+
+	public void setPrivacyConsentCompleted(boolean privacyConsentCompleted) {
+		this.privacyConsentCompleted = privacyConsentCompleted;
 	}
 
 	public String getToken() {
@@ -77,5 +136,13 @@ public class AuthSessionEntity {
 
 	public void setCreatedAt(Instant createdAt) {
 		this.createdAt = createdAt;
+	}
+
+	public Instant getLastSeenAt() {
+		return lastSeenAt;
+	}
+
+	public void setLastSeenAt(Instant lastSeenAt) {
+		this.lastSeenAt = lastSeenAt;
 	}
 }

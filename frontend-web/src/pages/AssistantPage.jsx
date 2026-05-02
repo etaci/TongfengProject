@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import RiskBadge from "../components/RiskBadge";
@@ -5,6 +6,72 @@ import SectionHeader from "../components/SectionHeader";
 import { ArraySummary, BulletList, MemberList } from "../components/HealthBlocks";
 import { familyRelationOptions, genderOptions } from "../constants/options";
 import { formatDate, formatDateTime } from "../utils/format";
+import { getMedicationPeriodLabel, getMedicationPeriods } from "../utils/forms";
+
+function getMedicationStatusLabel(status) {
+  switch (status) {
+    case "TAKEN":
+      return "已服用";
+    case "MISSED":
+      return "漏服";
+    case "SKIPPED":
+      return "跳过";
+    default:
+      return status || "未知";
+  }
+}
+
+function getAuthModeLabel(mode) {
+  switch (mode) {
+    case "PASSWORD":
+      return "正式账号";
+    case "MOCK":
+      return "开发体验";
+    default:
+      return mode || "未知";
+  }
+}
+
+function LabReportSelector({ app, data, busyMap, withErrorHandling }) {
+  const reports = data.labs || [];
+  const activeReportId = data.labResult?.reportId || data.labReview?.reportId;
+
+  if (!reports.length) {
+    return null;
+  }
+
+  return (
+    <div className="stack-list report-selector">
+      <strong className="subtle-title">最近报告</strong>
+      <div className="masonry-list">
+        {reports.slice(0, 4).map((item) => (
+          <article className="list-card" key={item.reportId}>
+            <div className="result-header">
+              <div>
+                <strong>{formatDate(item.reportDate)}</strong>
+                <p>报告 ID：{item.reportId}</p>
+              </div>
+              <RiskBadge level={item.overallRiskLevel} />
+            </div>
+            <p>{item.summary || "暂无解析摘要。"}</p>
+            <div className="action-row">
+              {activeReportId === item.reportId ? <span className="inline-tag">当前查看</span> : null}
+              <button
+                className="ghost-button action-button"
+                type="button"
+                disabled={busyMap.labReview}
+                onClick={() => withErrorHandling(() => app.loadLabReportReview(item.reportId))}
+              >
+                {busyMap.labReview ? "加载中..." : activeReportId === item.reportId ? "刷新复盘" : "查看复盘"}
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+      {reports.length > 4 ? <p className="meta-text">当前仅展示最近 4 份报告，可继续通过刷新数据同步最新化验单。</p> : null}
+    </div>
+  );
+}
 
 export default function AssistantPage({
   app,
@@ -15,9 +82,15 @@ export default function AssistantPage({
   profileDraft,
   setProfileDraft,
   handleProfileSubmit,
+  handlePrivacyConsentSubmit,
+  handlePasswordChange,
+  handleRevokeSession,
   medicationDraft,
   setMedicationDraft,
   handleMedicationSubmit,
+  medicationCheckinDraft,
+  setMedicationCheckinDraft,
+  handleMedicationCheckinSubmit,
   handleFileUpload,
   handleOpenFile,
   handleLabSubmit,
@@ -31,6 +104,40 @@ export default function AssistantPage({
   familySummaryTargetName,
   withErrorHandling,
 }) {
+  const [privacyDraft, setPrivacyDraft] = useState({
+    consentVersion: "v1.0",
+    privacyPolicyVersion: "privacy-v1.0",
+    privacyAccepted: true,
+    termsAccepted: true,
+    medicalDataAuthorized: true,
+    familyCollaborationAuthorized: true,
+    notificationAuthorized: true,
+  });
+  const [passwordDraft, setPasswordDraft] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+    logoutOtherSessions: true,
+  });
+  const medicationItems = data.medication?.currentMedications || [];
+  const selectedMedication = medicationItems.find((item) => item.name === medicationCheckinDraft.medicationName) || medicationItems[0] || null;
+  const medicationPeriodOptions = selectedMedication ? getMedicationPeriods(selectedMedication.frequency) : ["MORNING"];
+
+  useEffect(() => {
+    if (!data.privacyConsentCurrent) {
+      return;
+    }
+    setPrivacyDraft({
+      consentVersion: data.privacyConsentCurrent.consentVersion || "v1.0",
+      privacyPolicyVersion: data.privacyConsentCurrent.privacyPolicyVersion || "privacy-v1.0",
+      privacyAccepted: Boolean(data.privacyConsentCurrent.privacyAccepted),
+      termsAccepted: Boolean(data.privacyConsentCurrent.termsAccepted),
+      medicalDataAuthorized: Boolean(data.privacyConsentCurrent.medicalDataAuthorized),
+      familyCollaborationAuthorized: Boolean(data.privacyConsentCurrent.familyCollaborationAuthorized),
+      notificationAuthorized: Boolean(data.privacyConsentCurrent.notificationAuthorized),
+    });
+  }, [data.privacyConsentCurrent]);
+
   return (
     <section className="content-section" id="assistant">
       <SectionHeader
@@ -90,6 +197,136 @@ export default function AssistantPage({
               </>
             ) : (
               "登录后即可向知识库提问，这里会展示回答、引用来源和风险提示。"
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <div className="overview-grid overview-grid--secondary">
+        <Card className="span-2">
+          <div className="card-head">
+            <div>
+              <p className="eyebrow">Account security</p>
+              <h3>账户安全</h3>
+            </div>
+            <span className="inline-tag">{session?.authMode === "PASSWORD" ? "正式账号" : "开发体验"}</span>
+          </div>
+          {session?.authMode === "PASSWORD" ? (
+            <>
+              <div className="stats-grid stats-grid--compact">
+                <div className="stat-line">
+                  <span>账号类型</span>
+                  <strong>{data.authSession?.accountType || session.accountType || "-"}</strong>
+                </div>
+                <div className="stat-line">
+                  <span>账号标识</span>
+                  <strong>{data.authSession?.accountIdentifier || session.accountIdentifier || "-"}</strong>
+                </div>
+                <div className="stat-line">
+                  <span>活跃会话</span>
+                  <strong>{data.authActiveSessions?.length || 0} 个</strong>
+                </div>
+              </div>
+              <form
+                className="stack-form compact-form"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  const changed = await handlePasswordChange(passwordDraft);
+                  if (changed) {
+                    setPasswordDraft((current) => ({
+                      ...current,
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    }));
+                  }
+                }}
+              >
+                <label>
+                  <span>当前密码</span>
+                  <input
+                    type="password"
+                    value={passwordDraft.currentPassword}
+                    onChange={(event) => setPasswordDraft((current) => ({ ...current, currentPassword: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  <span>新密码</span>
+                  <input
+                    type="password"
+                    value={passwordDraft.newPassword}
+                    onChange={(event) => setPasswordDraft((current) => ({ ...current, newPassword: event.target.value }))}
+                    placeholder="至少 8 位"
+                  />
+                </label>
+                <label>
+                  <span>确认新密码</span>
+                  <input
+                    type="password"
+                    value={passwordDraft.confirmPassword}
+                    onChange={(event) => setPasswordDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                  />
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={passwordDraft.logoutOtherSessions}
+                    onChange={(event) => setPasswordDraft((current) => ({ ...current, logoutOtherSessions: event.target.checked }))}
+                  />
+                  <span>修改密码后自动退出其他设备会话</span>
+                </label>
+                <button className="primary-button" type="submit" disabled={!session || busyMap.passwordChange}>
+                  {busyMap.passwordChange ? "更新中..." : "更新密码"}
+                </button>
+              </form>
+            </>
+          ) : (
+            <EmptyState message="开发体验账号没有正式密码体系，切换到正式账号登录后可使用这里的安全能力。" />
+          )}
+        </Card>
+
+        <Card>
+          <div className="card-head">
+            <div>
+              <p className="eyebrow">Active sessions</p>
+              <h3>活跃会话</h3>
+            </div>
+          </div>
+          <div className="stack-list">
+            {data.authActiveSessions?.length ? (
+              data.authActiveSessions.map((item) => (
+                <article className="list-card" key={item.sessionCode}>
+                  <div className="result-header">
+                    <div>
+                      <strong>{getAuthModeLabel(item.authMode)}</strong>
+                      <p>{item.accountIdentifier || "开发体验账号"}</p>
+                    </div>
+                    <span className="inline-tag">{item.currentSession ? "当前设备" : "其他设备"}</span>
+                  </div>
+                  <div className="list-card__meta">
+                    <span>创建：{formatDateTime(item.createdAt)}</span>
+                    <span>最近活跃：{formatDateTime(item.lastSeenAt)}</span>
+                  </div>
+                  <div className="list-card__meta">
+                    <span>过期：{formatDateTime(item.expiresAt)}</span>
+                    <span>{item.accountType || "DEMO"}</span>
+                  </div>
+                  {!item.currentSession ? (
+                    <div className="action-row">
+                      <button
+                        className="ghost-button action-button"
+                        type="button"
+                        disabled={busyMap[`revoke-session-${item.sessionCode}`]}
+                        onClick={() => handleRevokeSession(item.sessionCode)}
+                      >
+                        {busyMap[`revoke-session-${item.sessionCode}`] ? "移除中..." : "移除此设备"}
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              ))
+            ) : (
+              <EmptyState message="当前没有可展示的活跃会话。" />
             )}
           </div>
         </Card>
@@ -206,6 +443,113 @@ export default function AssistantPage({
         <Card className="span-2">
           <div className="card-head">
             <div>
+              <p className="eyebrow">Privacy consent</p>
+              <h3>隐私与授权</h3>
+            </div>
+            <span className="inline-tag">{data.privacyConsentCurrent?.consentVersion || "未授权"}</span>
+          </div>
+          {data.privacyConsentCurrent ? (
+            <>
+              <div className="stats-grid stats-grid--compact">
+                <div className="stat-line">
+                  <span>当前版本</span>
+                  <strong>{data.privacyConsentCurrent.consentVersion}</strong>
+                </div>
+                <div className="stat-line">
+                  <span>隐私政策</span>
+                  <strong>{data.privacyConsentCurrent.privacyPolicyVersion}</strong>
+                </div>
+                <div className="stat-line">
+                  <span>生效时间</span>
+                  <strong>{formatDateTime(data.privacyConsentCurrent.effectiveAt)}</strong>
+                </div>
+              </div>
+              <form
+                className="stack-form compact-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handlePrivacyConsentSubmit(privacyDraft);
+                }}
+              >
+                <label className="checkbox-row">
+                  <input type="checkbox" checked={privacyDraft.privacyAccepted} readOnly />
+                  <span>已同意隐私政策</span>
+                </label>
+                <label className="checkbox-row">
+                  <input type="checkbox" checked={privacyDraft.termsAccepted} readOnly />
+                  <span>已同意服务条款</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.medicalDataAuthorized}
+                    onChange={(event) => setPrivacyDraft((current) => ({ ...current, medicalDataAuthorized: event.target.checked }))}
+                  />
+                  <span>允许平台使用健康数据生成主动管理建议</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.familyCollaborationAuthorized}
+                    onChange={(event) => setPrivacyDraft((current) => ({ ...current, familyCollaborationAuthorized: event.target.checked }))}
+                  />
+                  <span>允许后续启用家庭协同授权能力</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.notificationAuthorized}
+                    onChange={(event) => setPrivacyDraft((current) => ({ ...current, notificationAuthorized: event.target.checked }))}
+                  />
+                  <span>允许接收风险提醒和随访通知</span>
+                </label>
+                <button className="primary-button" type="submit" disabled={!session || busyMap.privacyConsent}>
+                  {busyMap.privacyConsent ? "保存中..." : "保存授权设置"}
+                </button>
+              </form>
+            </>
+          ) : (
+            <EmptyState message="当前账号还没有正式隐私授权记录，mock 体验账号不会生成这部分数据。" />
+          )}
+        </Card>
+
+        <Card>
+          <div className="card-head">
+            <div>
+              <p className="eyebrow">Consent history</p>
+              <h3>授权历史</h3>
+            </div>
+          </div>
+          <div className="stack-list">
+            {data.privacyConsentHistory?.length ? (
+              data.privacyConsentHistory.slice(0, 5).map((item) => (
+                <article className="list-card" key={item.consentCode}>
+                  <div className="result-header">
+                    <strong>{item.consentVersion}</strong>
+                    <span className="inline-tag">{item.sourceType}</span>
+                  </div>
+                  <p>隐私政策：{item.privacyPolicyVersion}</p>
+                  <div className="list-card__meta">
+                    <span>医疗数据：{item.medicalDataAuthorized ? "允许" : "关闭"}</span>
+                    <span>家属协同：{item.familyCollaborationAuthorized ? "允许" : "关闭"}</span>
+                  </div>
+                  <div className="list-card__meta">
+                    <span>通知提醒：{item.notificationAuthorized ? "允许" : "关闭"}</span>
+                    <span>{formatDateTime(item.effectiveAt)}</span>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyState message="暂无授权历史。" />
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <div className="overview-grid overview-grid--secondary">
+        <Card className="span-2">
+          <div className="card-head">
+            <div>
               <p className="eyebrow">Medication plan</p>
               <h3>用药计划</h3>
             </div>
@@ -217,9 +561,10 @@ export default function AssistantPage({
                 rows="8"
                 value={medicationDraft.lines}
                 onChange={(event) => setMedicationDraft((current) => ({ ...current, lines: event.target.value }))}
-                placeholder="每行一条，例如：别嘌醇 | 100mg | 每日一次 | 晚饭后"
+                placeholder="每行一条，例如：别嘌醇 | 100mg | 每日一次 | 晚饭后 | 5 | 3"
               />
             </label>
+            <p className="meta-text">格式：药名 | 剂量 | 频次 | 备注 | 剩余天数 | 提前提醒阈值。后两个字段可留空。</p>
             <label>
               <span>随访备注</span>
               <textarea
@@ -231,6 +576,148 @@ export default function AssistantPage({
             </label>
             <button className="primary-button" type="submit" disabled={!session || busyMap.medication}>
               {busyMap.medication ? "保存中..." : "保存用药计划"}
+            </button>
+          </form>
+        </Card>
+      </div>
+
+      <div className="overview-grid overview-grid--secondary">
+        <Card className="span-2">
+          <div className="card-head">
+            <div>
+              <p className="eyebrow">Medication adherence</p>
+              <h3>用药依从概览</h3>
+            </div>
+            <span className="inline-tag">{data.medicationAdherence?.summaryDate || "今日"}</span>
+          </div>
+          {data.medicationAdherence ? (
+            <>
+              <div className="stats-grid medication-stats-grid">
+                <div className="stat-line">
+                  <span>计划剂次</span>
+                  <strong>{data.medicationAdherence.plannedDoseCount || 0}</strong>
+                </div>
+                <div className="stat-line">
+                  <span>已服用</span>
+                  <strong>{data.medicationAdherence.takenDoseCount || 0}</strong>
+                </div>
+                <div className="stat-line">
+                  <span>漏服</span>
+                  <strong>{data.medicationAdherence.missedDoseCount || 0}</strong>
+                </div>
+                <div className="stat-line">
+                  <span>跳过</span>
+                  <strong>{data.medicationAdherence.skippedDoseCount || 0}</strong>
+                </div>
+                <div className="stat-line">
+                  <span>依从率 / 连续天数</span>
+                  <strong>{data.medicationAdherence.adherenceRate || 0}% / {data.medicationAdherence.currentStreakDays || 0} 天</strong>
+                </div>
+              </div>
+              <div className="split-block">
+                <div>
+                  <ArraySummary
+                    title="今日待确认"
+                    items={data.medicationAdherence.overdueItems}
+                    emptyMessage="今天的计划剂次已经全部确认。"
+                  />
+                </div>
+                <div>
+                  <BulletList title="下一步建议" items={data.medicationAdherence.nextActions} />
+                </div>
+              </div>
+              <div className="stack-list medication-checkin-list">
+                <strong className="subtle-title">最近打卡</strong>
+                {data.medicationAdherence.recentCheckins?.length ? (
+                  data.medicationAdherence.recentCheckins.map((item) => (
+                    <article className="list-card" key={`${item.checkinId}-${item.checkinAt}`}>
+                      <div className="result-header">
+                        <div>
+                          <strong>{item.medicationName}</strong>
+                          <p>{getMedicationPeriodLabel(item.scheduledPeriod)} / {getMedicationStatusLabel(item.status)}</p>
+                        </div>
+                        <span className="inline-tag">{item.checkinDate}</span>
+                      </div>
+                      <p>{item.guidance || item.note || "暂无补充说明。"}</p>
+                      <div className="list-card__meta">
+                        <span>{item.note || "无备注"}</span>
+                        <span>{formatDateTime(item.checkinAt)}</span>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <EmptyState message="还没有用药打卡记录。" />
+                )}
+              </div>
+            </>
+          ) : (
+            <EmptyState message="登录后会在这里展示今天的计划剂次、待确认项和最近打卡。" />
+          )}
+        </Card>
+
+        <Card>
+          <div className="card-head">
+            <div>
+              <p className="eyebrow">Medication check-in</p>
+              <h3>服药打卡</h3>
+            </div>
+          </div>
+          <form className="stack-form compact-form" onSubmit={handleMedicationCheckinSubmit}>
+            <label>
+              <span>药物</span>
+              <select
+                value={medicationCheckinDraft.medicationName}
+                onChange={(event) => setMedicationCheckinDraft((current) => ({ ...current, medicationName: event.target.value }))}
+                disabled={!medicationItems.length}
+              >
+                {medicationItems.length ? (
+                  medicationItems.map((item) => (
+                    <option key={`${item.name}-${item.frequency}`} value={item.name}>
+                      {item.name} / {item.dosage}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">请先维护用药计划</option>
+                )}
+              </select>
+            </label>
+            <label>
+              <span>时段</span>
+              <select
+                value={medicationCheckinDraft.scheduledPeriod}
+                onChange={(event) => setMedicationCheckinDraft((current) => ({ ...current, scheduledPeriod: event.target.value }))}
+                disabled={!selectedMedication}
+              >
+                {medicationPeriodOptions.map((period) => (
+                  <option key={period} value={period}>
+                    {getMedicationPeriodLabel(period)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>状态</span>
+              <select
+                value={medicationCheckinDraft.status}
+                onChange={(event) => setMedicationCheckinDraft((current) => ({ ...current, status: event.target.value }))}
+                disabled={!selectedMedication}
+              >
+                <option value="TAKEN">已服用</option>
+                <option value="MISSED">漏服</option>
+                <option value="SKIPPED">跳过</option>
+              </select>
+            </label>
+            <label>
+              <span>备注</span>
+              <textarea
+                rows="4"
+                value={medicationCheckinDraft.note}
+                onChange={(event) => setMedicationCheckinDraft((current) => ({ ...current, note: event.target.value }))}
+                placeholder="例如：早餐后服用、因胃部不适暂缓、忘记携带药物"
+              />
+            </label>
+            <button className="primary-button" type="submit" disabled={!session || busyMap.medicationCheckin || !selectedMedication}>
+              {busyMap.medicationCheckin ? "提交中..." : "提交本次打卡"}
             </button>
           </form>
         </Card>
@@ -316,6 +803,7 @@ export default function AssistantPage({
               <h3>最近一次化验单结果</h3>
             </div>
           </div>
+          <LabReportSelector app={app} data={data} busyMap={busyMap} withErrorHandling={withErrorHandling} />
           <div className={`result-panel ${data.labResult ? "" : "empty-panel"}`}>
             {data.labResult ? (
               <>
@@ -337,6 +825,43 @@ export default function AssistantPage({
                   ))}
                 </div>
                 <BulletList title="建议动作" items={data.labResult.suggestions} />
+                {data.labReview ? (
+                  <>
+                    <div className="stats-grid stats-grid--compact">
+                      <div className="stat-line">
+                        <span>目标尿酸</span>
+                        <strong>{data.labReview.targetUricAcidValue || "-"} {data.labReview.currentUricAcidUnit || ""}</strong>
+                      </div>
+                      <div className="stat-line">
+                        <span>本次尿酸</span>
+                        <strong>{data.labReview.currentUricAcidValue != null ? `${data.labReview.currentUricAcidValue} ${data.labReview.currentUricAcidUnit || ""}` : "未识别"}</strong>
+                      </div>
+                      <div className="stat-line">
+                        <span>与上次间隔</span>
+                        <strong>{data.labReview.daysBetweenReports != null ? `${data.labReview.daysBetweenReports} 天` : "暂无基线"}</strong>
+                      </div>
+                    </div>
+                    <p className="narrative-text">{data.labReview.reviewSummary}</p>
+                    <p className="narrative-text">{data.labReview.targetConclusion}</p>
+                    <ArraySummary title="关键变化" items={data.labReview.keyChanges} emptyMessage="暂无关键变化。" />
+                    <div className="indicator-grid">
+                      {(data.labReview.comparisons || []).map((item) => (
+                        <div className="indicator-chip" key={`${item.code}-${item.name}-review`}>
+                          <span>{item.name || item.code}</span>
+                          <strong>
+                            {item.currentValue != null ? `${item.currentValue} ${item.unit || ""}` : "暂无"}
+                            {item.previousValue != null ? ` / 上次 ${item.previousValue}` : ""}
+                          </strong>
+                          <small>{item.trend} / {item.currentRiskLevel}</small>
+                          <small>{item.interpretation}</small>
+                        </div>
+                      ))}
+                    </div>
+                    <BulletList title="复查建议" items={data.labReview.followUpRecommendation ? [data.labReview.followUpRecommendation] : []} />
+                    <BulletList title="下一步三件事" items={data.labReview.nextActions} />
+                    <BulletList title="可信边界" items={data.labReview.trustNotes} />
+                  </>
+                ) : null}
               </>
             ) : (
               "上传化验单后，这里会展示重点指标、风险判断和建议动作。"

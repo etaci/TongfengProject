@@ -6,26 +6,44 @@ import {
   acceptFamilyInvite,
   askKnowledge,
   bindDevice,
+  changePassword as changePasswordRequest,
   cancelFamilyInvite,
   claimGrowthReward,
+  getCurrentPrivacyConsent,
+  getCurrentSession,
+  getActiveSessions,
   createFamilyInvite,
+  createFamilyTask,
+  loginWithPassword,
+  logoutSession,
   getDeviceSyncEvents,
   getBootstrapData,
   getDashboardBundle,
   getExtendedData,
   getFamilyPatientSummary,
+  getFamilyWeeklyReport,
+  getLabReportReview,
+  getMedicationAdherence,
+  getMedicationWeeklyReport,
+  getPrivacyConsentHistory,
   getRecordSnapshots,
   getRecordAudits,
   getRecordCenter,
   getRecordDetail,
+  revokeSession as revokeSessionRequest,
   mockLogin,
+  completeFamilyTask,
   removeFamilyBinding,
+  registerAccount,
   restoreRecord,
   syncDeviceData,
   submitRecord,
+  updateFamilyBindingPermissions as updateFamilyBindingPermissionsRequest,
+  updatePrivacyConsent as updatePrivacyConsentRequest,
   unbindDevice,
   updateRecordDetail,
   updateProactiveSettings,
+  submitMedicationCheckin as submitMedicationCheckinRequest,
   updateMedications,
   updateProfile,
   uploadFile,
@@ -36,6 +54,7 @@ import { mapMedicationToText, mapProfileToForm } from "../utils/forms";
 const initialData = {
   capabilities: { features: [] },
   overview: null,
+  todayPlan: null,
   trends: null,
   summaries: [],
   reminders: [],
@@ -44,12 +63,19 @@ const initialData = {
   timeline: [],
   labs: [],
   labResult: null,
+  labReview: null,
   knowledge: null,
   persona: null,
   uricAcidCauseAnalysis: null,
   mvpMetricsSummary: null,
+  authSession: null,
+  authActiveSessions: [],
   profile: null,
+  privacyConsentCurrent: null,
+  privacyConsentHistory: [],
   medication: null,
+  medicationAdherence: null,
+  medicationWeeklyReport: null,
   proactiveSettings: null,
   proactiveBrief: null,
   flareReview: null,
@@ -57,6 +83,8 @@ const initialData = {
   familyMembers: { asPatient: [], asCaregiver: [] },
   familyAlerts: [],
   familyPatientSummary: null,
+  familyWeeklyReport: null,
+  familyTasks: { asPatient: [], asCaregiver: [] },
   devices: [],
   deviceSyncEvents: [],
   growthOverview: null,
@@ -111,12 +139,17 @@ export default function useTongfengApp() {
   const applyExtendedPayload = useCallback((extended) => {
     setData((current) => ({
       ...current,
+      authSession: extended.authSession,
+      authActiveSessions: extended.authActiveSessions || [],
+      privacyConsentCurrent: extended.privacyConsentCurrent,
+      privacyConsentHistory: extended.privacyConsentHistory || [],
       proactiveSettings: extended.proactiveSettings,
       proactiveBrief: extended.proactiveBrief,
       flareReview: extended.flareReview,
       familyInvites: extended.familyInvites || [],
       familyMembers: extended.familyMembers || { asPatient: [], asCaregiver: [] },
       familyAlerts: extended.familyAlerts || [],
+      familyTasks: extended.familyTasks || { asPatient: [], asCaregiver: [] },
       devices: extended.devices || [],
       deviceCatalog: extended.deviceCatalog || [],
       deviceOverview: extended.deviceOverview,
@@ -145,21 +178,27 @@ export default function useTongfengApp() {
 
   const applyBootstrapPayload = useCallback((responses) => {
     const capabilities = responses[0].data || { features: [] };
+    const labs = responses[9].data || [];
     setData((current) => ({
       ...current,
       capabilities,
       profile: responses[1].data,
       overview: responses[2].data,
-      trends: responses[3].data,
-      summaries: responses[4].data || [],
-      reminders: responses[5].data || [],
-      meals: responses[6].data || [],
-      timeline: responses[7].data?.events || [],
-      labs: responses[8].data || [],
-      persona: responses[9].data,
-      uricAcidCauseAnalysis: responses[10].data,
-      medication: responses[11].data,
-      mvpMetricsSummary: responses[12].data,
+      todayPlan: responses[3].data,
+      trends: responses[4].data,
+      summaries: responses[5].data || [],
+      reminders: responses[6].data || [],
+      meals: responses[7].data || [],
+      timeline: responses[8].data?.events || [],
+      labs,
+      labResult: labs[0] || null,
+      labReview: current.labReview,
+      persona: responses[10].data,
+      uricAcidCauseAnalysis: responses[11].data,
+      medication: responses[12].data,
+      medicationAdherence: responses[13].data,
+      medicationWeeklyReport: responses[14].data,
+      mvpMetricsSummary: responses[15].data,
     }));
   }, []);
 
@@ -175,29 +214,43 @@ export default function useTongfengApp() {
 
       const responses = await getDashboardBundle(nextSession, nextDays);
       const capabilities = responses[0].data || { features: [] };
+      const labs = responses[8].data || [];
       const [extended, snapshots] = await Promise.all([
         getExtendedData(nextSession, { familyEnabled: isFamilyEnabled(capabilities) }),
         getRecordSnapshots(nextSession),
       ]);
+      const labReviewResponse = labs.length
+        ? await getLabReportReview(nextSession, labs[0].reportId).catch(() => null)
+        : null;
       setData((current) => ({
         ...current,
         capabilities,
         overview: responses[1].data,
-        trends: responses[2].data,
-        summaries: responses[3].data || [],
-        reminders: responses[4].data || [],
-        meals: responses[5].data || [],
-        timeline: responses[6].data?.events || [],
-        labs: responses[7].data || [],
-        persona: responses[8].data,
-        uricAcidCauseAnalysis: responses[9].data,
-        mvpMetricsSummary: responses[10].data,
+        todayPlan: responses[2].data,
+        trends: responses[3].data,
+        summaries: responses[4].data || [],
+        reminders: responses[5].data || [],
+        meals: responses[6].data || [],
+        timeline: responses[7].data?.events || [],
+        labs,
+        labResult: labs[0] || null,
+        labReview: labReviewResponse?.data || null,
+        persona: responses[9].data,
+        uricAcidCauseAnalysis: responses[10].data,
+        medicationAdherence: responses[11].data,
+        medicationWeeklyReport: responses[12].data,
+        mvpMetricsSummary: responses[13].data,
+        authSession: extended.authSession,
+        authActiveSessions: extended.authActiveSessions || [],
+        privacyConsentCurrent: extended.privacyConsentCurrent,
+        privacyConsentHistory: extended.privacyConsentHistory || [],
         proactiveSettings: extended.proactiveSettings,
         proactiveBrief: extended.proactiveBrief,
         flareReview: extended.flareReview,
         familyInvites: extended.familyInvites || [],
         familyMembers: extended.familyMembers || { asPatient: [], asCaregiver: [] },
         familyAlerts: extended.familyAlerts || [],
+        familyTasks: extended.familyTasks || { asPatient: [], asCaregiver: [] },
         devices: extended.devices || [],
         deviceCatalog: extended.deviceCatalog || [],
         deviceOverview: extended.deviceOverview,
@@ -235,6 +288,7 @@ export default function useTongfengApp() {
       try {
         const responses = await getBootstrapData(nextSession, nextDays);
         const capabilities = responses[0].data || { features: [] };
+        const labs = responses[9].data || [];
         const [extended, snapshots] = await Promise.all([
           getExtendedData(nextSession, { familyEnabled: isFamilyEnabled(capabilities) }),
           getRecordSnapshots(nextSession),
@@ -242,6 +296,12 @@ export default function useTongfengApp() {
         applyBootstrapPayload(responses);
         applyExtendedPayload(extended);
         applyRecordSnapshots(snapshots);
+        if (labs.length) {
+          const labReviewResponse = await getLabReportReview(nextSession, labs[0].reportId).catch(() => null);
+          setData((current) => ({ ...current, labReview: labReviewResponse?.data || null }));
+        } else {
+          setData((current) => ({ ...current, labReview: null }));
+        }
 
         if (!silent) {
           setBanner({ tone: "success", message: "数据加载完成。" });
@@ -264,24 +324,54 @@ export default function useTongfengApp() {
     }
   }, [session, trendDays, hydrate]);
 
-  const login = useCallback(async (nickname) => {
-    setBusy("login", true);
+  const loginDemo = useCallback(async (nickname) => {
+    setBusy("mockLogin", true);
     try {
       const response = await mockLogin(nickname);
       writeSession(response.data);
       setSession(response.data);
-      setBanner({ tone: "success", message: `欢迎回来，${response.data.nickname}。正在同步你的健康数据。` });
+      setBanner({ tone: "success", message: `已进入开发体验环境，欢迎你，${response.data.nickname}。` });
+    } finally {
+      setBusy("mockLogin", false);
+    }
+  }, [setBusy]);
+
+  const register = useCallback(async (payload) => {
+    setBusy("register", true);
+    try {
+      const response = await registerAccount(payload);
+      writeSession(response.data);
+      setSession(response.data);
+      setBanner({ tone: "success", message: `注册成功，欢迎你，${response.data.nickname}。正在同步你的健康数据。` });
+    } finally {
+      setBusy("register", false);
+    }
+  }, [setBusy]);
+
+  const login = useCallback(async (payload) => {
+    setBusy("login", true);
+    try {
+      const response = await loginWithPassword(payload);
+      writeSession(response.data);
+      setSession(response.data);
+      setBanner({ tone: "success", message: `登录成功，欢迎回来，${response.data.nickname}。` });
     } finally {
       setBusy("login", false);
     }
   }, [setBusy]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    if (session?.token) {
+      try {
+        await logoutSession(session);
+      } catch {
+      }
+    }
     clearSession();
     setSession(null);
     setData(initialData);
-    setBanner({ tone: "neutral", message: "会话已清除，你可以重新登录继续体验。" });
-  }, []);
+    setBanner({ tone: "neutral", message: "会话已安全退出，你可以重新登录继续使用。" });
+  }, [session]);
 
   const submitProfile = useCallback(
     async (payload) => {
@@ -297,18 +387,130 @@ export default function useTongfengApp() {
     [session, setBusy],
   );
 
+  const submitPrivacyConsent = useCallback(
+    async (payload) => {
+      setBusy("privacyConsent", true);
+      try {
+        const response = await updatePrivacyConsentRequest(session, payload);
+        const historyResponse = await getPrivacyConsentHistory(session);
+        const sessionResponse = await getCurrentSession(session).catch(() => null);
+        setData((current) => ({
+          ...current,
+          authSession: sessionResponse?.data || current.authSession,
+          privacyConsentCurrent: response.data,
+          privacyConsentHistory: historyResponse.data || [],
+        }));
+        setBanner({ tone: "success", message: "隐私授权设置已更新。" });
+      } finally {
+        setBusy("privacyConsent", false);
+      }
+    },
+    [session, setBusy],
+  );
+
+  const submitPasswordChange = useCallback(
+    async (payload) => {
+      setBusy("passwordChange", true);
+      try {
+        const response = await changePasswordRequest(session, payload);
+        const [sessionResponse, activeSessionsResponse] = await Promise.all([
+          getCurrentSession(session).catch(() => null),
+          getActiveSessions(session).then((result) => result.data || []).catch(() => []),
+        ]);
+        setData((current) => ({
+          ...current,
+          authSession: sessionResponse?.data || current.authSession,
+          authActiveSessions: activeSessionsResponse,
+        }));
+        setBanner({ tone: "success", message: response.data.message || "密码已更新。" });
+      } finally {
+        setBusy("passwordChange", false);
+      }
+    },
+    [session, setBusy],
+  );
+
+  const revokeAuthSession = useCallback(
+    async (sessionCode) => {
+      setBusy(`revoke-session-${sessionCode}`, true);
+      try {
+        const response = await revokeSessionRequest(session, sessionCode);
+        const sessionResponse = await getCurrentSession(session).catch(() => null);
+        const activeSessionsResponse = await getActiveSessions(session).catch(() => ({ data: [] }));
+        setData((current) => ({
+          ...current,
+          authSession: sessionResponse?.data || current.authSession,
+          authActiveSessions: activeSessionsResponse.data || [],
+        }));
+        setBanner({ tone: "success", message: response.data.message || "会话已移除。" });
+      } finally {
+        setBusy(`revoke-session-${sessionCode}`, false);
+      }
+    },
+    [session, setBusy],
+  );
+
   const submitMedication = useCallback(
     async (payload) => {
       setBusy("medication", true);
       try {
         const response = await updateMedications(session, payload);
-        setData((current) => ({ ...current, medication: response.data }));
+        const [adherence, weeklyReport] = await Promise.all([
+          getMedicationAdherence(session, 7),
+          getMedicationWeeklyReport(session, 7),
+        ]);
+        setData((current) => ({
+          ...current,
+          medication: response.data,
+          medicationAdherence: adherence.data,
+          medicationWeeklyReport: weeklyReport.data,
+        }));
+        await refreshDashboard(session, trendDays, true);
         setBanner({ tone: "success", message: "用药计划已更新。" });
       } finally {
         setBusy("medication", false);
       }
     },
-    [session, setBusy],
+    [refreshDashboard, session, setBusy, trendDays],
+  );
+
+  const loadMedicationAdherence = useCallback(
+    async (days = 7) => {
+      const response = await getMedicationAdherence(session, days);
+      setData((current) => ({ ...current, medicationAdherence: response.data }));
+      return response.data;
+    },
+    [session],
+  );
+
+  const loadMedicationWeeklyReport = useCallback(
+    async (days = 7) => {
+      const response = await getMedicationWeeklyReport(session, days);
+      setData((current) => ({ ...current, medicationWeeklyReport: response.data }));
+      return response.data;
+    },
+    [session],
+  );
+
+  const submitMedicationCheckin = useCallback(
+    async (payload) => {
+      setBusy("medicationCheckin", true);
+      try {
+        const response = await submitMedicationCheckinRequest(session, payload);
+        const adherence = await getMedicationAdherence(session, 7);
+        const weeklyReport = await getMedicationWeeklyReport(session, 7);
+        setData((current) => ({
+          ...current,
+          medicationAdherence: adherence.data,
+          medicationWeeklyReport: weeklyReport.data,
+        }));
+        await refreshDashboard(session, trendDays, true);
+        setBanner({ tone: "success", message: `${response.data.medicationName} 已完成本次用药打卡。` });
+      } finally {
+        setBusy("medicationCheckin", false);
+      }
+    },
+    [refreshDashboard, session, setBusy, trendDays],
   );
 
   const submitSimpleRecord = useCallback(
@@ -345,7 +547,8 @@ export default function useTongfengApp() {
       setBusy("lab", true);
       try {
         const response = await analyzeLab(session, formData);
-        setData((current) => ({ ...current, labResult: response.data }));
+        const reviewResponse = await getLabReportReview(session, response.data.reportId).catch(() => null);
+        setData((current) => ({ ...current, labResult: response.data, labReview: reviewResponse?.data || null }));
         await refreshDashboard(session, trendDays, true);
         setBanner({ tone: "success", message: "化验单解析已完成。" });
       } finally {
@@ -353,6 +556,25 @@ export default function useTongfengApp() {
       }
     },
     [refreshDashboard, session, setBusy, trendDays],
+  );
+
+  const loadLabReportReview = useCallback(
+    async (reportId) => {
+      setBusy("labReview", true);
+      try {
+        const response = await getLabReportReview(session, reportId);
+        setData((current) => ({
+          ...current,
+          labResult: current.labs.find((item) => item.reportId === reportId) || current.labResult,
+          labReview: response.data,
+        }));
+        setBanner({ tone: "success", message: "化验单复盘已加载。" });
+        return response.data;
+      } finally {
+        setBusy("labReview", false);
+      }
+    },
+    [session, setBusy],
   );
 
   const submitKnowledgeQuestion = useCallback(
@@ -452,6 +674,62 @@ export default function useTongfengApp() {
       }
     },
     [session, setBusy],
+  );
+
+  const loadFamilyWeeklyReport = useCallback(
+    async (patientUserId, days = 7) => {
+      setBusy("familyWeeklyReport", true);
+      try {
+        const response = await getFamilyWeeklyReport(session, patientUserId, days);
+        setData((current) => ({ ...current, familyWeeklyReport: response.data }));
+        setBanner({ tone: "success", message: "家属周报已加载。" });
+      } finally {
+        setBusy("familyWeeklyReport", false);
+      }
+    },
+    [session, setBusy],
+  );
+
+  const submitFamilyBindingPermissions = useCallback(
+    async (bindingCode, payload) => {
+      setBusy(`family-permission-${bindingCode}`, true);
+      try {
+        await updateFamilyBindingPermissionsRequest(session, bindingCode, payload);
+        await refreshDashboard(session, trendDays, true);
+        setBanner({ tone: "success", message: "家属权限已更新。" });
+      } finally {
+        setBusy(`family-permission-${bindingCode}`, false);
+      }
+    },
+    [refreshDashboard, session, setBusy, trendDays],
+  );
+
+  const submitFamilyTask = useCallback(
+    async (bindingCode, payload) => {
+      setBusy("family-task-create", true);
+      try {
+        await createFamilyTask(session, bindingCode, payload);
+        await refreshDashboard(session, trendDays, true);
+        setBanner({ tone: "success", message: "家属代办已创建。" });
+      } finally {
+        setBusy("family-task-create", false);
+      }
+    },
+    [refreshDashboard, session, setBusy, trendDays],
+  );
+
+  const submitFamilyTaskCompletion = useCallback(
+    async (taskCode, payload) => {
+      setBusy(`family-task-${taskCode}`, true);
+      try {
+        await completeFamilyTask(session, taskCode, payload);
+        await refreshDashboard(session, trendDays, true);
+        setBanner({ tone: "success", message: "家属代办已确认完成。" });
+      } finally {
+        setBusy(`family-task-${taskCode}`, false);
+      }
+    },
+    [refreshDashboard, session, setBusy, trendDays],
   );
 
   const submitDeviceBinding = useCallback(
@@ -676,15 +954,21 @@ export default function useTongfengApp() {
     isHydrating,
     busyMap,
     data,
+    register,
     login,
+    loginDemo,
     logout,
     hydrate,
     refreshDashboard,
     submitProfile,
+    submitPrivacyConsent,
+    submitPasswordChange,
     submitMedication,
+    submitMedicationCheckin,
     submitSimpleRecord,
     submitMealAnalysis,
     submitLabAnalysis,
+    loadLabReportReview,
     submitKnowledgeQuestion,
     submitProactiveSettings,
     submitFamilyInvite,
@@ -692,6 +976,10 @@ export default function useTongfengApp() {
     cancelInvite,
     unbindFamilyMember,
     loadFamilySummary,
+    loadFamilyWeeklyReport,
+    submitFamilyBindingPermissions,
+    submitFamilyTask,
+    submitFamilyTaskCompletion,
     submitDeviceBinding,
     removeDeviceBinding,
     submitDeviceSync,
@@ -703,6 +991,9 @@ export default function useTongfengApp() {
     removeRecord,
     restoreRecordFromAudit,
     claimReward,
+    revokeAuthSession,
+    loadMedicationAdherence,
+    loadMedicationWeeklyReport,
     applyRecordSnapshots,
     profileForm,
     medicationForm,

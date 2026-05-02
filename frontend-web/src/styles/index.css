@@ -539,6 +539,10 @@ textarea:focus {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.medication-stats-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .stat-line {
   padding: 18px;
 }
@@ -558,6 +562,14 @@ textarea:focus {
 .split-block {
   align-items: stretch;
   margin-top: 24px;
+}
+
+.medication-checkin-list {
+  margin-top: 24px;
+}
+
+.report-selector {
+  margin-bottom: 18px;
 }
 
 .split-block > div {
@@ -693,6 +705,54 @@ textarea:focus {
   margin-top: 12px;
 }
 
+.today-triage-card h4 {
+  margin: 12px 0 0;
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.today-triage-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.9fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.today-triage-next {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--cream-strong);
+}
+
+.today-triage-next span,
+.today-action-badges {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.today-triage-next strong {
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.today-triage-next small {
+  color: var(--muted);
+}
+
+.today-action-card .result-header {
+  align-items: flex-start;
+}
+
+.today-action-badges {
+  display: grid;
+  gap: 8px;
+  min-width: 86px;
+}
+
 .action-button {
   padding: 10px 14px;
 }
@@ -710,7 +770,9 @@ textarea:focus {
   .trend-grid,
   .record-grid,
   .stats-grid,
-  .hero-metrics {
+  .medication-stats-grid,
+  .hero-metrics,
+  .today-triage-hero {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -730,7 +792,9 @@ textarea:focus {
   .record-grid,
   .trend-grid,
   .stats-grid,
+  .medication-stats-grid,
   .hero-metrics,
+  .today-triage-hero,
   .site-header__actions,
   .split-block {
     grid-template-columns: 1fr;
