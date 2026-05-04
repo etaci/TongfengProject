@@ -65,6 +65,7 @@ function HeroMetrics({ overview }) {
 export default function App() {
   const app = useTongfengApp();
   const { data, busyMap, session } = app;
+  const showDevLogin = import.meta.env.DEV;
 
   const [authMode, setAuthMode] = useState("login");
   const [loginDraft, setLoginDraft] = useState({
@@ -85,6 +86,14 @@ export default function App() {
     medicalDataAuthorized: true,
     familyCollaborationAuthorized: true,
     notificationAuthorized: true,
+  });
+  const [resetDraft, setResetDraft] = useState({
+    accountType: "EMAIL",
+    account: "",
+    verificationCode: "",
+    newPassword: "",
+    confirmPassword: "",
+    requestedAt: "",
   });
   const [mockNickname, setMockNickname] = useState("");
   const [profileDraft, setProfileDraft] = useState(app.profileForm);
@@ -327,6 +336,65 @@ export default function App() {
     await withErrorHandling(() => app.loginDemo(nickname));
   }
 
+  async function handleRequestPasswordResetCode(event) {
+    event.preventDefault();
+
+    if (!resetDraft.account.trim()) {
+      app.setBanner({ tone: "warning", message: "请先填写账号后再获取验证码。" });
+      return;
+    }
+
+    await withErrorHandling(async () => {
+      await app.requestVerificationCode({
+        purpose: "PASSWORD_RESET",
+        accountType: resetDraft.accountType,
+        account: resetDraft.account.trim(),
+      });
+      setResetDraft((current) => ({
+        ...current,
+        account: current.account.trim(),
+        requestedAt: new Date().toISOString(),
+      }));
+    });
+  }
+
+  async function handlePasswordResetConfirm(event) {
+    event.preventDefault();
+
+    if (!resetDraft.account.trim() || !resetDraft.verificationCode.trim()) {
+      app.setBanner({ tone: "warning", message: "请先填写账号和验证码。" });
+      return;
+    }
+
+    if (!resetDraft.newPassword.trim() || !resetDraft.confirmPassword.trim()) {
+      app.setBanner({ tone: "warning", message: "请先填写并确认新密码。" });
+      return;
+    }
+
+    await withErrorHandling(async () => {
+      await app.confirmPasswordReset({
+        accountType: resetDraft.accountType,
+        account: resetDraft.account.trim(),
+        verificationCode: resetDraft.verificationCode.trim(),
+        newPassword: resetDraft.newPassword,
+        confirmPassword: resetDraft.confirmPassword,
+      });
+      setLoginDraft((current) => ({
+        ...current,
+        accountType: resetDraft.accountType,
+        account: resetDraft.account.trim(),
+        password: "",
+      }));
+      setResetDraft((current) => ({
+        ...current,
+        verificationCode: "",
+        newPassword: "",
+        confirmPassword: "",
+      }));
+      setAuthMode("login");
+    });
+  }
+
   async function handlePasswordChange(payload) {
     try {
       await app.submitPasswordChange(payload);
@@ -339,6 +407,26 @@ export default function App() {
 
   async function handleRevokeSession(sessionCode) {
     await withErrorHandling(() => app.revokeAuthSession(sessionCode));
+  }
+
+  async function handleRequestAccountVerificationCode() {
+    await withErrorHandling(() => app.requestAccountVerificationCode());
+  }
+
+  async function handleConfirmAccountVerification(verificationCode) {
+    const code = verificationCode.trim();
+    if (!code) {
+      app.setBanner({ tone: "warning", message: "请输入验证码后再完成账号验证。" });
+      return false;
+    }
+
+    try {
+      await app.confirmAccountVerification({ verificationCode: code });
+      return true;
+    } catch (error) {
+      app.setBanner({ tone: "danger", message: error.message });
+      return false;
+    }
   }
 
   async function handleRefresh() {
@@ -793,6 +881,9 @@ export default function App() {
               <button className={authMode === "register" ? "pill-button" : "ghost-button"} type="button" onClick={() => setAuthMode("register")}>
                 新用户注册
               </button>
+              <button className={authMode === "reset" ? "pill-button" : "ghost-button"} type="button" onClick={() => setAuthMode("reset")}>
+                找回密码
+              </button>
             </div>
             {authMode === "login" ? (
               <form className="stack-form" onSubmit={handlePasswordLogin}>
@@ -826,8 +917,11 @@ export default function App() {
                 <button className="primary-button" type="submit" disabled={busyMap.login}>
                   {busyMap.login ? "登录中..." : "登录并进入"}
                 </button>
+                <button className="ghost-button" type="button" onClick={() => setAuthMode("reset")}>
+                  忘记密码
+                </button>
               </form>
-            ) : (
+            ) : authMode === "register" ? (
               <form className="stack-form" onSubmit={handleRegister}>
                 <label>
                   <span>昵称</span>
@@ -912,19 +1006,78 @@ export default function App() {
                   {busyMap.register ? "注册中..." : "注册并进入"}
                 </button>
               </form>
-            )}
-            <div className="session-card">
-              <strong>开发体验入口</strong>
-              <form className="stack-form compact-form" onSubmit={handleMockLogin}>
+            ) : (
+              <form className="stack-form" onSubmit={handlePasswordResetConfirm}>
                 <label>
-                  <span>Mock 昵称</span>
-                  <input value={mockNickname} onChange={(event) => setMockNickname(event.target.value)} placeholder="例如：开发联调用户" />
+                  <span>账号类型</span>
+                  <select value={resetDraft.accountType} onChange={(event) => setResetDraft((current) => ({ ...current, accountType: event.target.value }))}>
+                    {authAccountTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <button className="ghost-button" type="submit" disabled={busyMap.mockLogin}>
-                  {busyMap.mockLogin ? "进入中..." : "进入开发体验环境"}
+                <label>
+                  <span>账号</span>
+                  <input
+                    value={resetDraft.account}
+                    onChange={(event) => setResetDraft((current) => ({ ...current, account: event.target.value }))}
+                    placeholder={resetDraft.accountType === "EMAIL" ? "例如：zhangsan@example.com" : "例如：13800138000"}
+                  />
+                </label>
+                <div className="action-row">
+                  <button className="ghost-button" type="button" disabled={busyMap.requestVerificationCode} onClick={handleRequestPasswordResetCode}>
+                    {busyMap.requestVerificationCode ? "发送中..." : "获取验证码"}
+                  </button>
+                  <span className="meta-text">
+                    {resetDraft.requestedAt ? `最近发送：${formatDateTime(resetDraft.requestedAt)}` : "当前为模拟投递骨架，联调时会在提示条显示验证码。"}
+                  </span>
+                </div>
+                <label>
+                  <span>验证码</span>
+                  <input
+                    value={resetDraft.verificationCode}
+                    onChange={(event) => setResetDraft((current) => ({ ...current, verificationCode: event.target.value }))}
+                    placeholder="输入收到的 6 位验证码"
+                  />
+                </label>
+                <label>
+                  <span>新密码</span>
+                  <input
+                    type="password"
+                    value={resetDraft.newPassword}
+                    onChange={(event) => setResetDraft((current) => ({ ...current, newPassword: event.target.value }))}
+                    placeholder="至少 8 位"
+                  />
+                </label>
+                <label>
+                  <span>确认新密码</span>
+                  <input
+                    type="password"
+                    value={resetDraft.confirmPassword}
+                    onChange={(event) => setResetDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                  />
+                </label>
+                <button className="primary-button" type="submit" disabled={busyMap.confirmPasswordReset}>
+                  {busyMap.confirmPasswordReset ? "重置中..." : "确认重置密码"}
                 </button>
               </form>
-            </div>
+            )}
+            {showDevLogin ? (
+              <div className="session-card">
+                <strong>开发体验入口</strong>
+                <form className="stack-form compact-form" onSubmit={handleMockLogin}>
+                  <label>
+                    <span>Mock 昵称</span>
+                    <input value={mockNickname} onChange={(event) => setMockNickname(event.target.value)} placeholder="例如：开发联调用户" />
+                  </label>
+                  <button className="ghost-button" type="submit" disabled={busyMap.mockLogin}>
+                    {busyMap.mockLogin ? "进入中..." : "进入开发体验环境"}
+                  </button>
+                </form>
+              </div>
+            ) : null}
             <div className="session-card">
               {session ? (
                 <>
@@ -932,10 +1085,16 @@ export default function App() {
                   <p>用户 ID：{session.userId}</p>
                   <p>登录方式：{session.authMode || "UNKNOWN"} / {session.accountType || "DEMO"}</p>
                   <p>账号标识：{session.accountIdentifier || "开发体验账号"}</p>
+                  <p>当前设备：{session.deviceLabel || "未识别"}</p>
+                  <p>登录风险：{session.loginRiskLevel || "GREEN"}</p>
+                  <p>网络标识：{session.clientIpMasked || "-"}</p>
+                  <p>账号验证：{session.accountVerified ? "已验证" : "待验证"}</p>
+                  <p>隐私授权：{session.privacyConsentCompleted ? "已完成" : "待完善"}</p>
+                  {session.securityNotices?.length ? <p>安全提示：{session.securityNotices.join("；")}</p> : null}
                   <p>过期时间：{formatDateTime(session.expiresAt)}</p>
                 </>
               ) : (
-                <p>当前优先展示真实登录骨架，同时保留 mock 入口用于本地联调。</p>
+                <p>{showDevLogin ? "当前优先展示真实登录骨架，开发环境保留 mock 入口用于本地联调。" : "当前已切到正式登录入口，开发体验入口仅在本地开发环境显示。"}</p>
               )}
             </div>
             <StatusBanner tone={app.banner.tone} message={app.banner.message} />
@@ -1025,6 +1184,8 @@ export default function App() {
                 handlePrivacyConsentSubmit={handlePrivacyConsentSubmit}
                 handlePasswordChange={handlePasswordChange}
                 handleRevokeSession={handleRevokeSession}
+                handleRequestAccountVerificationCode={handleRequestAccountVerificationCode}
+                handleConfirmAccountVerification={handleConfirmAccountVerification}
                 medicationDraft={medicationDraft}
                 setMedicationDraft={setMedicationDraft}
                 handleMedicationSubmit={handleMedicationSubmit}

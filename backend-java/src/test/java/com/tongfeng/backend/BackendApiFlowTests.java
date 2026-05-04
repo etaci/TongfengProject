@@ -36,6 +36,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -553,6 +554,378 @@ class BackendApiFlowTests {
 	}
 
 	@Test
+	void shouldSupportPasswordResetAndAccountVerificationFlow() throws Exception {
+		String account = "verified-user@example.com";
+
+		MvcResult registerResult = mockMvc.perform(post("/api/v1/auth/register")
+						.header("User-Agent", "TongfengTestBrowser/1.0")
+						.header("X-Device-Fingerprint", "device-a")
+						.header("X-Device-Label", "Web / Chrome / Windows")
+						.header("X-Forwarded-For", "10.0.0.1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "verified-user",
+								  "accountType": "EMAIL",
+								  "account": "verified-user@example.com",
+								  "password": "Password123",
+								  "confirmPassword": "Password123",
+								  "consent": {
+								    "consentVersion": "v1.0",
+								    "privacyPolicyVersion": "privacy-v1.0",
+								    "privacyAccepted": true,
+								    "termsAccepted": true,
+								    "medicalDataAuthorized": true,
+								    "familyCollaborationAuthorized": true,
+								    "notificationAuthorized": true
+								  }
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.authMode").value("PASSWORD"))
+				.andExpect(jsonPath("$.data.accountVerified").value(false))
+				.andReturn();
+
+		String registerToken = objectMapper.readTree(registerResult.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		mockMvc.perform(get("/api/v1/auth/account-verification/status")
+						.header("Authorization", "Bearer " + registerToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.verified").value(false));
+
+		MvcResult resetCodeResult = mockMvc.perform(post("/api/v1/auth/verification-codes/request")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "purpose": "PASSWORD_RESET",
+								  "accountType": "EMAIL",
+								  "account": "verified-user@example.com"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.purpose").value("PASSWORD_RESET"))
+				.andExpect(jsonPath("$.data.simulatedCode").isNotEmpty())
+				.andReturn();
+
+		String resetCode = objectMapper.readTree(resetCodeResult.getResponse().getContentAsString())
+				.path("data")
+				.path("simulatedCode")
+				.asText();
+
+		mockMvc.perform(post("/api/v1/auth/password-reset/confirm")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "accountType": "EMAIL",
+								  "account": "verified-user@example.com",
+								  "verificationCode": "%s",
+								  "newPassword": "Password456",
+								  "confirmPassword": "Password456"
+								}
+								""".formatted(resetCode)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.message").value("密码已重置，请使用新密码重新登录"));
+
+		mockMvc.perform(post("/api/v1/auth/login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "accountType": "EMAIL",
+								  "account": "verified-user@example.com",
+								  "password": "Password123"
+								}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+
+		MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
+						.header("User-Agent", "TongfengTestBrowser/2.0")
+						.header("X-Device-Fingerprint", "device-b")
+						.header("X-Device-Label", "Web / Edge / Windows")
+						.header("X-Forwarded-For", "172.16.10.25")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "accountType": "EMAIL",
+								  "account": "verified-user@example.com",
+								  "password": "Password456"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.accountVerified").value(false))
+				.andExpect(jsonPath("$.data.loginRiskLevel").value("GREEN"))
+				.andExpect(jsonPath("$.data.deviceLabel").value("Web / Edge / Windows"))
+				.andExpect(jsonPath("$.data.clientIpMasked").value("172.16.*.*"))
+				.andExpect(jsonPath("$.data.securityNotices").isEmpty())
+				.andReturn();
+
+		String loginToken = objectMapper.readTree(loginResult.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		MvcResult verifyCodeResult = mockMvc.perform(post("/api/v1/auth/account-verification/request")
+						.header("Authorization", "Bearer " + loginToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.purpose").value("ACCOUNT_VERIFY"))
+				.andExpect(jsonPath("$.data.simulatedCode").isNotEmpty())
+				.andReturn();
+
+		String verifyCode = objectMapper.readTree(verifyCodeResult.getResponse().getContentAsString())
+				.path("data")
+				.path("simulatedCode")
+				.asText();
+
+		mockMvc.perform(post("/api/v1/auth/account-verification/confirm")
+						.header("Authorization", "Bearer " + loginToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "verificationCode": "%s"
+								}
+								""".formatted(verifyCode)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.verified").value(true))
+				.andExpect(jsonPath("$.data.accountIdentifier").value(account));
+
+		mockMvc.perform(get("/api/v1/auth/account-verification/status")
+						.header("Authorization", "Bearer " + loginToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.verified").value(true))
+				.andExpect(jsonPath("$.data.verifiedAt").isNotEmpty());
+
+		mockMvc.perform(get("/api/v1/auth/session")
+						.header("Authorization", "Bearer " + loginToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.accountVerified").value(true))
+				.andExpect(jsonPath("$.data.loginRiskLevel").value("GREEN"));
+	}
+
+	@Test
+	void shouldThrottleVerificationCodeRequestsWithinCooldownWindow() throws Exception {
+		mockMvc.perform(post("/api/v1/auth/register")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "cooldown-user",
+								  "accountType": "EMAIL",
+								  "account": "cooldown-user@example.com",
+								  "password": "Password123",
+								  "confirmPassword": "Password123",
+								  "consent": {
+								    "consentVersion": "v1.0",
+								    "privacyPolicyVersion": "privacy-v1.0",
+								    "privacyAccepted": true,
+								    "termsAccepted": true,
+								    "medicalDataAuthorized": true,
+								    "familyCollaborationAuthorized": true,
+								    "notificationAuthorized": true
+								  }
+								}
+								"""))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/v1/auth/verification-codes/request")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "purpose": "PASSWORD_RESET",
+								  "accountType": "EMAIL",
+								  "account": "cooldown-user@example.com"
+								}
+								"""))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/v1/auth/verification-codes/request")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "purpose": "PASSWORD_RESET",
+								  "accountType": "EMAIL",
+								  "account": "cooldown-user@example.com"
+								}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("VERIFICATION_CODE_COOLDOWN"));
+	}
+
+	@Test
+	void shouldFlagNewDeviceAndNewIpOnSubsequentLogin() throws Exception {
+		mockMvc.perform(post("/api/v1/auth/register")
+						.header("User-Agent", "TongfengRiskBrowser/1.0")
+						.header("X-Device-Fingerprint", "risk-device-a")
+						.header("X-Device-Label", "Web / Chrome / macOS")
+						.header("X-Forwarded-For", "10.20.30.40")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "risk-user",
+								  "accountType": "EMAIL",
+								  "account": "risk-user@example.com",
+								  "password": "Password123",
+								  "confirmPassword": "Password123",
+								  "consent": {
+								    "consentVersion": "v1.0",
+								    "privacyPolicyVersion": "privacy-v1.0",
+								    "privacyAccepted": true,
+								    "termsAccepted": true,
+								    "medicalDataAuthorized": true,
+								    "familyCollaborationAuthorized": true,
+								    "notificationAuthorized": true
+								  }
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.loginRiskLevel").value("GREEN"));
+
+		MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
+						.header("User-Agent", "TongfengRiskBrowser/2.0")
+						.header("X-Device-Fingerprint", "risk-device-b")
+						.header("X-Device-Label", "Web / Firefox / Linux")
+						.header("X-Forwarded-For", "172.22.1.8")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "accountType": "EMAIL",
+								  "account": "risk-user@example.com",
+								  "password": "Password123"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.loginRiskLevel").value("RED"))
+				.andExpect(jsonPath("$.data.clientIpMasked").value("172.22.*.*"))
+				.andExpect(jsonPath("$.data.securityNotices[0]").isNotEmpty())
+				.andReturn();
+
+		String token = objectMapper.readTree(loginResult.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		mockMvc.perform(get("/api/v1/reminders")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[*].type", hasItem("ACCOUNT_SECURITY")));
+	}
+
+	@Test
+	void shouldValidateAccountFormatsStrictly() throws Exception {
+		mockMvc.perform(post("/api/v1/auth/register")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "invalid-email-user",
+								  "accountType": "EMAIL",
+								  "account": "invalid-email",
+								  "password": "Password123",
+								  "confirmPassword": "Password123",
+								  "consent": {
+								    "consentVersion": "v1.0",
+								    "privacyPolicyVersion": "privacy-v1.0",
+								    "privacyAccepted": true,
+								    "termsAccepted": true,
+								    "medicalDataAuthorized": true,
+								    "familyCollaborationAuthorized": true,
+								    "notificationAuthorized": true
+								  }
+								}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("EMAIL_INVALID"));
+
+		mockMvc.perform(post("/api/v1/auth/verification-codes/request")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "purpose": "PASSWORD_RESET",
+								  "accountType": "PHONE",
+								  "account": "12345"
+								}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("PHONE_INVALID"));
+
+		mockMvc.perform(post("/api/v1/auth/register")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "phone-format-user",
+								  "accountType": "PHONE",
+								  "account": "+86 138-0013-8000",
+								  "password": "Password123",
+								  "confirmPassword": "Password123",
+								  "consent": {
+								    "consentVersion": "v1.0",
+								    "privacyPolicyVersion": "privacy-v1.0",
+								    "privacyAccepted": true,
+								    "termsAccepted": true,
+								    "medicalDataAuthorized": true,
+								    "familyCollaborationAuthorized": true,
+								    "notificationAuthorized": true
+								  }
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.accountType").value("PHONE"))
+				.andExpect(jsonPath("$.data.accountIdentifier").value("13800138000"));
+	}
+
+	@Test
+	void shouldLockAccountAfterRepeatedLoginFailures() throws Exception {
+		mockMvc.perform(post("/api/v1/auth/register")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "locked-user",
+								  "accountType": "EMAIL",
+								  "account": "locked-user@example.com",
+								  "password": "Password123",
+								  "confirmPassword": "Password123",
+								  "consent": {
+								    "consentVersion": "v1.0",
+								    "privacyPolicyVersion": "privacy-v1.0",
+								    "privacyAccepted": true,
+								    "termsAccepted": true,
+								    "medicalDataAuthorized": true,
+								    "familyCollaborationAuthorized": true,
+								    "notificationAuthorized": true
+								  }
+								}
+								"""))
+				.andExpect(status().isOk());
+
+		for (int attempt = 1; attempt <= 5; attempt++) {
+			mockMvc.perform(post("/api/v1/auth/login")
+							.contentType(MediaType.APPLICATION_JSON)
+							.content("""
+									{
+									  "accountType": "EMAIL",
+									  "account": "locked-user@example.com",
+									  "password": "WrongPassword123"
+									}
+									"""))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+		}
+
+		mockMvc.perform(post("/api/v1/auth/login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "accountType": "EMAIL",
+								  "account": "locked-user@example.com",
+								  "password": "Password123"
+								}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("ACCOUNT_LOGIN_LOCKED"))
+				.andExpect(jsonPath("$.message", containsString("15")));
+	}
+
+	@Test
 	void shouldBuildUricAcidCauseAnalysisFromRecentSignals() throws Exception {
 		MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/mock-login")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -725,6 +1098,52 @@ class BackendApiFlowTests {
 		assertTrue(uricAcidComparison != null);
 		assertEquals("DOWN", uricAcidComparison.path("trend").asText());
 		assertEquals("-40", uricAcidComparison.path("deltaValue").asText());
+	}
+
+	@Test
+	void shouldRequireManualConfirmationWhenLabIndicatorsUnavailable() throws Exception {
+		MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "lab-manual-confirm-user"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		JsonNode loginBody = objectMapper.readTree(loginResult.getResponse().getContentAsString());
+		String token = loginBody.path("data").path("token").asText();
+		String userId = loginBody.path("data").path("userId").asText();
+		String suffix = String.valueOf(System.nanoTime());
+
+		LabReportRecordEntity currentReport = new LabReportRecordEntity();
+		currentReport.setReportCode("lab-manual-" + suffix);
+		currentReport.setUserCode(userId);
+		currentReport.setReportDate(LocalDate.now());
+		currentReport.setIndicatorsJson(objectMapper.writeValueAsString(List.of()));
+		currentReport.setOverallRiskLevel("YELLOW");
+		currentReport.setSuggestionsJson(objectMapper.writeValueAsString(List.of(
+				"本次化验单未能稳定提取出关键指标，当前结果不会进入正式复盘结论链路。"
+		)));
+		currentReport.setSummaryText("当前图片或文件未能稳定提取出关键指标，已转为人工确认模式，暂不输出正式化验结论。");
+		labReportRecordRepository.save(currentReport);
+
+		mockMvc.perform(get("/api/v1/lab-reports")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].manualConfirmationRequired").value(true))
+				.andExpect(jsonPath("$.data[0].reviewReady").value(false))
+				.andExpect(jsonPath("$.data[0].extractionStatus").value("MANUAL_CONFIRMATION_REQUIRED"));
+
+		mockMvc.perform(get("/api/v1/lab-reports/{reportId}/review", currentReport.getReportCode())
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.manualConfirmationRequired").value(true))
+				.andExpect(jsonPath("$.data.reviewReady").value(false))
+				.andExpect(jsonPath("$.data.reviewStatus").value("MANUAL_CONFIRMATION_REQUIRED"))
+				.andExpect(jsonPath("$.data.comparisons").isEmpty())
+				.andExpect(jsonPath("$.data.nextActions[0]").value("重新上传更清晰的化验单图片或 PDF，优先确保指标名称、数值和单位完整可见。"));
 	}
 
 	@Test

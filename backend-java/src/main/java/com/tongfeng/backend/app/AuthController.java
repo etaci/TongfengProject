@@ -1,5 +1,6 @@
 package com.tongfeng.backend.app;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,23 +23,40 @@ public class AuthController {
 
 	@PostMapping("/api/v1/auth/mock-login")
 	public ApiResponse<AppContracts.AuthTokenResponse> mockLogin(
-			@Valid @RequestBody AppContracts.MockLoginRequest request
+			@Valid @RequestBody AppContracts.MockLoginRequest request,
+			HttpServletRequest servletRequest
 	) {
-		return ApiResponse.success(healthAssistantService.mockLogin(request));
+		return ApiResponse.success(healthAssistantService.mockLogin(request, buildRequestContext(servletRequest)));
 	}
 
 	@PostMapping("/api/v1/auth/register")
 	public ApiResponse<AppContracts.AuthTokenResponse> register(
-			@Valid @RequestBody AppContracts.RegisterRequest request
+			@Valid @RequestBody AppContracts.RegisterRequest request,
+			HttpServletRequest servletRequest
 	) {
-		return ApiResponse.success(healthAssistantService.register(request));
+		return ApiResponse.success(healthAssistantService.register(request, buildRequestContext(servletRequest)));
 	}
 
 	@PostMapping("/api/v1/auth/login")
 	public ApiResponse<AppContracts.AuthTokenResponse> login(
-			@Valid @RequestBody AppContracts.LoginRequest request
+			@Valid @RequestBody AppContracts.LoginRequest request,
+			HttpServletRequest servletRequest
 	) {
-		return ApiResponse.success(healthAssistantService.login(request));
+		return ApiResponse.success(healthAssistantService.login(request, buildRequestContext(servletRequest)));
+	}
+
+	@PostMapping("/api/v1/auth/verification-codes/request")
+	public ApiResponse<AppContracts.VerificationChallengeResponse> requestVerificationCode(
+			@Valid @RequestBody AppContracts.VerificationCodeRequest request
+	) {
+		return ApiResponse.success(healthAssistantService.requestVerificationCode(request));
+	}
+
+	@PostMapping("/api/v1/auth/password-reset/confirm")
+	public ApiResponse<AppContracts.AuthLogoutResponse> confirmPasswordReset(
+			@Valid @RequestBody AppContracts.PasswordResetConfirmRequest request
+	) {
+		return ApiResponse.success(healthAssistantService.confirmPasswordReset(request));
 	}
 
 	@PostMapping("/api/v1/auth/logout")
@@ -73,6 +91,31 @@ public class AuthController {
 		return ApiResponse.success(healthAssistantService.changePassword(userId, token, request));
 	}
 
+	@GetMapping("/api/v1/auth/account-verification/status")
+	public ApiResponse<AppContracts.AccountVerificationStatusResponse> getAccountVerificationStatus(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestAttribute(AuthInterceptor.CURRENT_TOKEN) String token
+	) {
+		return ApiResponse.success(healthAssistantService.getAccountVerificationStatus(userId, token));
+	}
+
+	@PostMapping("/api/v1/auth/account-verification/request")
+	public ApiResponse<AppContracts.VerificationChallengeResponse> requestAccountVerificationCode(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestAttribute(AuthInterceptor.CURRENT_TOKEN) String token
+	) {
+		return ApiResponse.success(healthAssistantService.requestAccountVerificationCode(userId, token));
+	}
+
+	@PostMapping("/api/v1/auth/account-verification/confirm")
+	public ApiResponse<AppContracts.AccountVerificationStatusResponse> confirmAccountVerification(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestAttribute(AuthInterceptor.CURRENT_TOKEN) String token,
+			@Valid @RequestBody AppContracts.VerificationCodeConfirmRequest request
+	) {
+		return ApiResponse.success(healthAssistantService.confirmAccountVerification(userId, token, request));
+	}
+
 	@DeleteMapping("/api/v1/auth/sessions/{sessionCode}")
 	public ApiResponse<AppContracts.AuthSessionRevokeResponse> revokeSession(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
@@ -102,5 +145,18 @@ public class AuthController {
 			@Valid @RequestBody AppContracts.PrivacyConsentSubmitRequest request
 	) {
 		return ApiResponse.success(healthAssistantService.updatePrivacyConsent(userId, request));
+	}
+
+	private AuthRequestContext buildRequestContext(HttpServletRequest request) {
+		String forwardedFor = request.getHeader("X-Forwarded-For");
+		String clientIp = forwardedFor != null && !forwardedFor.isBlank()
+				? forwardedFor.split(",")[0].trim()
+				: request.getRemoteAddr();
+		return new AuthRequestContext(
+				clientIp,
+				request.getHeader("User-Agent"),
+				request.getHeader("X-Device-Fingerprint"),
+				request.getHeader("X-Device-Label")
+		);
 	}
 }

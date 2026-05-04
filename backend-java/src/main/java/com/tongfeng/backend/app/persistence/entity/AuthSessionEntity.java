@@ -39,6 +39,24 @@ public class AuthSessionEntity {
 	@Column(length = 128)
 	private String accountIdentifier;
 
+	@Column(length = 128)
+	private String deviceFingerprintHash;
+
+	@Column(length = 128)
+	private String deviceLabel;
+
+	@Column(length = 128)
+	private String clientIpHash;
+
+	@Column(length = 64)
+	private String clientIpMasked;
+
+	@Column(length = 16)
+	private String loginRiskLevel;
+
+	@Column(length = 1000)
+	private String securityNoticesJson;
+
 	@Column(nullable = false)
 	private boolean privacyConsentCompleted;
 
@@ -104,6 +122,54 @@ public class AuthSessionEntity {
 
 	public void setAccountIdentifier(String accountIdentifier) {
 		this.accountIdentifier = accountIdentifier;
+	}
+
+	public String getDeviceFingerprintHash() {
+		return deviceFingerprintHash;
+	}
+
+	public void setDeviceFingerprintHash(String deviceFingerprintHash) {
+		this.deviceFingerprintHash = deviceFingerprintHash;
+	}
+
+	public String getDeviceLabel() {
+		return deviceLabel;
+	}
+
+	public void setDeviceLabel(String deviceLabel) {
+		this.deviceLabel = deviceLabel;
+	}
+
+	public String getClientIpHash() {
+		return clientIpHash;
+	}
+
+	public void setClientIpHash(String clientIpHash) {
+		this.clientIpHash = clientIpHash;
+	}
+
+	public String getClientIpMasked() {
+		return clientIpMasked;
+	}
+
+	public void setClientIpMasked(String clientIpMasked) {
+		this.clientIpMasked = clientIpMasked;
+	}
+
+	public String getLoginRiskLevel() {
+		return loginRiskLevel;
+	}
+
+	public void setLoginRiskLevel(String loginRiskLevel) {
+		this.loginRiskLevel = loginRiskLevel;
+	}
+
+	public String getSecurityNoticesJson() {
+		return securityNoticesJson;
+	}
+
+	public void setSecurityNoticesJson(String securityNoticesJson) {
+		this.securityNoticesJson = securityNoticesJson;
 	}
 
 	public boolean isPrivacyConsentCompleted() {

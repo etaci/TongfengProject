@@ -32,6 +32,36 @@ function getAuthModeLabel(mode) {
   }
 }
 
+function getLabExtractionStatusLabel(status) {
+  switch (status) {
+    case "MANUAL_CONFIRMATION_REQUIRED":
+      return "待人工确认";
+    case "EXTRACTED":
+      return "已提取";
+    case "PROCESSING":
+      return "解析中";
+    default:
+      return status || "待处理";
+  }
+}
+
+function getLabReviewStatusLabel(status, reviewReady) {
+  if (reviewReady) {
+    return "可复盘";
+  }
+
+  switch (status) {
+    case "MANUAL_CONFIRMATION_REQUIRED":
+      return "待人工确认";
+    case "PENDING_BASELINE":
+      return "待建立基线";
+    case "PENDING_REVIEW":
+      return "待复盘";
+    default:
+      return status || "待复盘";
+  }
+}
+
 function LabReportSelector({ app, data, busyMap, withErrorHandling }) {
   const reports = data.labs || [];
   const activeReportId = data.labResult?.reportId || data.labReview?.reportId;
@@ -54,15 +84,26 @@ function LabReportSelector({ app, data, busyMap, withErrorHandling }) {
               <RiskBadge level={item.overallRiskLevel} />
             </div>
             <p>{item.summary || "暂无解析摘要。"}</p>
+            <div className="list-card__meta">
+              <span>{getLabExtractionStatusLabel(item.extractionStatus)}</span>
+              <span>{item.reviewReady ? "复盘已就绪" : "复盘未就绪"}</span>
+            </div>
             <div className="action-row">
               {activeReportId === item.reportId ? <span className="inline-tag">当前查看</span> : null}
+              {item.manualConfirmationRequired ? <span className="inline-tag risk-yellow">待人工确认</span> : null}
               <button
                 className="ghost-button action-button"
                 type="button"
                 disabled={busyMap.labReview}
                 onClick={() => withErrorHandling(() => app.loadLabReportReview(item.reportId))}
               >
-                {busyMap.labReview ? "加载中..." : activeReportId === item.reportId ? "刷新复盘" : "查看复盘"}
+                {busyMap.labReview
+                  ? "加载中..."
+                  : item.manualConfirmationRequired
+                    ? "查看确认说明"
+                    : activeReportId === item.reportId
+                      ? "刷新复盘"
+                      : "查看复盘"}
               </button>
             </div>
           </article>
@@ -85,6 +126,8 @@ export default function AssistantPage({
   handlePrivacyConsentSubmit,
   handlePasswordChange,
   handleRevokeSession,
+  handleRequestAccountVerificationCode,
+  handleConfirmAccountVerification,
   medicationDraft,
   setMedicationDraft,
   handleMedicationSubmit,
@@ -119,9 +162,17 @@ export default function AssistantPage({
     confirmPassword: "",
     logoutOtherSessions: true,
   });
+  const [accountVerificationCode, setAccountVerificationCode] = useState("");
   const medicationItems = data.medication?.currentMedications || [];
   const selectedMedication = medicationItems.find((item) => item.name === medicationCheckinDraft.medicationName) || medicationItems[0] || null;
   const medicationPeriodOptions = selectedMedication ? getMedicationPeriods(selectedMedication.frequency) : ["MORNING"];
+  const accountVerificationStatus = data.accountVerificationStatus || {
+    accountType: data.authSession?.accountType || session?.accountType || "",
+    accountIdentifier: data.authSession?.accountIdentifier || session?.accountIdentifier || "",
+    verified: Boolean(data.authSession?.accountVerified ?? session?.accountVerified),
+    verifiedAt: null,
+    message: "",
+  };
 
   useEffect(() => {
     if (!data.privacyConsentCurrent) {
@@ -226,6 +277,75 @@ export default function AssistantPage({
                   <span>活跃会话</span>
                   <strong>{data.authActiveSessions?.length || 0} 个</strong>
                 </div>
+                <div className="stat-line">
+                  <span>当前设备</span>
+                  <strong>{data.authSession?.deviceLabel || session.deviceLabel || "-"}</strong>
+                </div>
+              </div>
+              <div className="action-row">
+                <span className={`inline-tag ${accountVerificationStatus.verified ? "risk-green" : "risk-yellow"}`}>
+                  {accountVerificationStatus.verified ? "账号已验证" : "账号待验证"}
+                </span>
+                <span className={`inline-tag ${(data.authSession?.privacyConsentCompleted ?? session.privacyConsentCompleted) ? "risk-green" : "risk-yellow"}`}>
+                  {(data.authSession?.privacyConsentCompleted ?? session.privacyConsentCompleted) ? "授权已完成" : "授权待完善"}
+                </span>
+                <span className="inline-tag">风险 {data.authSession?.loginRiskLevel || session.loginRiskLevel || "GREEN"}</span>
+              </div>
+              <div className="session-card">
+                <div className="result-header">
+                  <div>
+                    <strong>账号验证状态</strong>
+                    <p>{accountVerificationStatus.accountIdentifier || data.authSession?.accountIdentifier || "当前正式账号"}</p>
+                  </div>
+                  <span className={`inline-tag ${accountVerificationStatus.verified ? "risk-green" : "risk-yellow"}`}>
+                    {accountVerificationStatus.verified ? "已验证" : "待验证"}
+                  </span>
+                </div>
+                <p className="narrative-text">
+                  {accountVerificationStatus.verified
+                    ? accountVerificationStatus.message || "当前账号已完成验证，可作为后续安全提醒、找回密码和风险通知的可信触点。"
+                    : accountVerificationStatus.message || "建议先完成一次账号验证，后续再逐步接入短信或邮件真实投递能力。"}
+                </p>
+                {accountVerificationStatus.verifiedAt ? (
+                  <p className="meta-text">完成时间：{formatDateTime(accountVerificationStatus.verifiedAt)}</p>
+                ) : null}
+                {!accountVerificationStatus.verified ? (
+                  <div className="stack-form compact-form">
+                    <div className="action-row">
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        disabled={!session || busyMap.accountVerificationRequest}
+                        onClick={() => withErrorHandling(() => handleRequestAccountVerificationCode())}
+                      >
+                        {busyMap.accountVerificationRequest ? "发送中..." : "发送验证验证码"}
+                      </button>
+                      <span className="meta-text">当前为安全骨架，联调验证码会在页面提示条中展示。</span>
+                    </div>
+                    <label>
+                      <span>验证码</span>
+                      <input
+                        value={accountVerificationCode}
+                        onChange={(event) => setAccountVerificationCode(event.target.value)}
+                        placeholder="输入收到的 6 位验证码"
+                      />
+                    </label>
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled={!session || busyMap.accountVerificationConfirm}
+                      onClick={async () => {
+                        const verified = await handleConfirmAccountVerification(accountVerificationCode);
+                        if (verified) {
+                          setAccountVerificationCode("");
+                        }
+                      }}
+                    >
+                      {busyMap.accountVerificationConfirm ? "验证中..." : "确认完成账号验证"}
+                    </button>
+                  </div>
+                ) : null}
+                <BulletList title="安全提示" items={data.authSession?.securityNotices} />
               </div>
               <form
                 className="stack-form compact-form"
@@ -310,6 +430,13 @@ export default function AssistantPage({
                   <div className="list-card__meta">
                     <span>过期：{formatDateTime(item.expiresAt)}</span>
                     <span>{item.accountType || "DEMO"}</span>
+                  </div>
+                  <div className="list-card__meta">
+                    <span>{item.deviceLabel || "未识别设备"}</span>
+                    <span>{item.clientIpMasked || "-"}</span>
+                  </div>
+                  <div className="list-card__meta">
+                    <span>风险等级：{item.loginRiskLevel || "GREEN"}</span>
                   </div>
                   {!item.currentSession ? (
                     <div className="action-row">
@@ -815,51 +942,100 @@ export default function AssistantPage({
                   <RiskBadge level={data.labResult.overallRiskLevel} />
                 </div>
                 <p>{data.labResult.summary || "暂无解析摘要。"}</p>
-                <div className="indicator-grid">
-                  {(data.labResult.indicators || []).map((item) => (
-                    <div className="indicator-chip" key={`${item.code}-${item.name}`}>
-                      <span>{item.name || item.code}</span>
-                      <strong>{item.value != null ? `${item.value} ${item.unit || ""}` : "暂无"}</strong>
-                      <small>{item.referenceRange || "无参考范围"} / {item.riskLevel}</small>
-                    </div>
-                  ))}
+                <div className="stats-grid stats-grid--compact">
+                  <div className="stat-line">
+                    <span>提取状态</span>
+                    <strong>{getLabExtractionStatusLabel(data.labResult.extractionStatus)}</strong>
+                  </div>
+                  <div className="stat-line">
+                    <span>复盘状态</span>
+                    <strong>{getLabReviewStatusLabel(data.labReview?.reviewStatus, data.labReview?.reviewReady)}</strong>
+                  </div>
+                  <div className="stat-line">
+                    <span>人工确认</span>
+                    <strong>{data.labResult.manualConfirmationRequired ? "需要" : "不需要"}</strong>
+                  </div>
                 </div>
+                {data.labResult.manualConfirmationRequired ? (
+                  <div className="result-panel">
+                    <p className="narrative-text">
+                      当前报告已进入人工确认模式。系统不会再使用估算值补全指标，也不会把这份报告直接纳入目标值判断和趋势复盘。
+                    </p>
+                    <p className="meta-text">
+                      当前提取状态：{getLabExtractionStatusLabel(data.labResult.extractionStatus)} / 复盘状态：{getLabReviewStatusLabel(data.labReview?.reviewStatus, data.labReview?.reviewReady)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="indicator-grid">
+                    {(data.labResult.indicators || []).map((item) => (
+                      <div className="indicator-chip" key={`${item.code}-${item.name}`}>
+                        <span>{item.name || item.code}</span>
+                        <strong>{item.value != null ? `${item.value} ${item.unit || ""}` : "暂无"}</strong>
+                        <small>{item.referenceRange || "无参考范围"} / {item.riskLevel}</small>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <BulletList title="建议动作" items={data.labResult.suggestions} />
+                <BulletList title="可信边界" items={data.labResult.trustNotes} />
                 {data.labReview ? (
                   <>
-                    <div className="stats-grid stats-grid--compact">
-                      <div className="stat-line">
-                        <span>目标尿酸</span>
-                        <strong>{data.labReview.targetUricAcidValue || "-"} {data.labReview.currentUricAcidUnit || ""}</strong>
-                      </div>
-                      <div className="stat-line">
-                        <span>本次尿酸</span>
-                        <strong>{data.labReview.currentUricAcidValue != null ? `${data.labReview.currentUricAcidValue} ${data.labReview.currentUricAcidUnit || ""}` : "未识别"}</strong>
-                      </div>
-                      <div className="stat-line">
-                        <span>与上次间隔</span>
-                        <strong>{data.labReview.daysBetweenReports != null ? `${data.labReview.daysBetweenReports} 天` : "暂无基线"}</strong>
-                      </div>
-                    </div>
-                    <p className="narrative-text">{data.labReview.reviewSummary}</p>
-                    <p className="narrative-text">{data.labReview.targetConclusion}</p>
-                    <ArraySummary title="关键变化" items={data.labReview.keyChanges} emptyMessage="暂无关键变化。" />
-                    <div className="indicator-grid">
-                      {(data.labReview.comparisons || []).map((item) => (
-                        <div className="indicator-chip" key={`${item.code}-${item.name}-review`}>
-                          <span>{item.name || item.code}</span>
-                          <strong>
-                            {item.currentValue != null ? `${item.currentValue} ${item.unit || ""}` : "暂无"}
-                            {item.previousValue != null ? ` / 上次 ${item.previousValue}` : ""}
-                          </strong>
-                          <small>{item.trend} / {item.currentRiskLevel}</small>
-                          <small>{item.interpretation}</small>
+                    {data.labReview.reviewReady ? (
+                      <>
+                        <div className="stats-grid stats-grid--compact">
+                          <div className="stat-line">
+                            <span>目标尿酸</span>
+                            <strong>{data.labReview.targetUricAcidValue || "-"} {data.labReview.currentUricAcidUnit || ""}</strong>
+                          </div>
+                          <div className="stat-line">
+                            <span>本次尿酸</span>
+                            <strong>{data.labReview.currentUricAcidValue != null ? `${data.labReview.currentUricAcidValue} ${data.labReview.currentUricAcidUnit || ""}` : "未识别"}</strong>
+                          </div>
+                          <div className="stat-line">
+                            <span>与上次间隔</span>
+                            <strong>{data.labReview.daysBetweenReports != null ? `${data.labReview.daysBetweenReports} 天` : "暂无基线"}</strong>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                    <BulletList title="复查建议" items={data.labReview.followUpRecommendation ? [data.labReview.followUpRecommendation] : []} />
-                    <BulletList title="下一步三件事" items={data.labReview.nextActions} />
-                    <BulletList title="可信边界" items={data.labReview.trustNotes} />
+                        <div className="list-card__meta">
+                          <span>复盘状态：{getLabReviewStatusLabel(data.labReview.reviewStatus, data.labReview.reviewReady)}</span>
+                          <span>
+                            对比报告：
+                            {data.labReview.comparedReportDate ? formatDate(data.labReview.comparedReportDate) : "暂无"}
+                          </span>
+                        </div>
+                        <p className="narrative-text">{data.labReview.reviewSummary}</p>
+                        <p className="narrative-text">{data.labReview.targetConclusion}</p>
+                        <ArraySummary title="关键变化" items={data.labReview.keyChanges} emptyMessage="暂无关键变化。" />
+                        <div className="indicator-grid">
+                          {(data.labReview.comparisons || []).map((item) => (
+                            <div className="indicator-chip" key={`${item.code}-${item.name}-review`}>
+                              <span>{item.name || item.code}</span>
+                              <strong>
+                                {item.currentValue != null ? `${item.currentValue} ${item.unit || ""}` : "暂无"}
+                                {item.previousValue != null ? ` / 上次 ${item.previousValue}` : ""}
+                              </strong>
+                              <small>{item.trend} / {item.currentRiskLevel}</small>
+                              <small>{item.interpretation}</small>
+                            </div>
+                          ))}
+                        </div>
+                        <BulletList title="复查建议" items={data.labReview.followUpRecommendation ? [data.labReview.followUpRecommendation] : []} />
+                        <BulletList title="下一步三件事" items={data.labReview.nextActions} />
+                        <BulletList title="可信边界" items={data.labReview.trustNotes} />
+                      </>
+                    ) : (
+                      <>
+                        <div className="action-row">
+                          <span className="inline-tag risk-yellow">{getLabReviewStatusLabel(data.labReview.reviewStatus, data.labReview.reviewReady)}</span>
+                          {data.labReview.manualConfirmationRequired ? <span className="inline-tag">等待补充清晰报告</span> : null}
+                        </div>
+                        <p className="narrative-text">{data.labReview.reviewSummary}</p>
+                        <p className="narrative-text">{data.labReview.targetConclusion}</p>
+                        <ArraySummary title="当前状态" items={data.labReview.keyChanges} emptyMessage="当前暂无可复盘指标。" />
+                        <BulletList title="下一步三件事" items={data.labReview.nextActions} />
+                        <BulletList title="可信边界" items={data.labReview.trustNotes} />
+                      </>
+                    )}
                   </>
                 ) : null}
               </>

@@ -71,6 +71,36 @@ public final class AppContracts {
 	) {
 	}
 
+	public record VerificationCodeRequest(
+			@NotBlank(message = "用途不能为空")
+			String purpose,
+			@NotBlank(message = "账号类型不能为空")
+			String accountType,
+			@NotBlank(message = "账号不能为空")
+			String account
+	) {
+	}
+
+	public record VerificationCodeConfirmRequest(
+			@NotBlank(message = "验证码不能为空")
+			String verificationCode
+	) {
+	}
+
+	public record PasswordResetConfirmRequest(
+			@NotBlank(message = "账号类型不能为空")
+			String accountType,
+			@NotBlank(message = "账号不能为空")
+			String account,
+			@NotBlank(message = "验证码不能为空")
+			String verificationCode,
+			@NotBlank(message = "新密码不能为空")
+			String newPassword,
+			@NotBlank(message = "确认密码不能为空")
+			String confirmPassword
+	) {
+	}
+
 	public record ChangePasswordRequest(
 			@NotBlank(message = "当前密码不能为空")
 			String currentPassword,
@@ -89,6 +119,11 @@ public final class AppContracts {
 			String authMode,
 			String accountType,
 			String accountIdentifier,
+			String deviceLabel,
+			String clientIpMasked,
+			String loginRiskLevel,
+			List<String> securityNotices,
+			boolean accountVerified,
 			boolean privacyConsentCompleted,
 			Instant createdAt,
 			Instant lastSeenAt,
@@ -105,6 +140,11 @@ public final class AppContracts {
 			String authMode,
 			String accountType,
 			String accountIdentifier,
+			String deviceLabel,
+			String clientIpMasked,
+			String loginRiskLevel,
+			List<String> securityNotices,
+			boolean accountVerified,
 			boolean privacyConsentCompleted,
 			Instant createdAt,
 			Instant lastSeenAt,
@@ -123,6 +163,9 @@ public final class AppContracts {
 			String authMode,
 			String accountType,
 			String accountIdentifier,
+			String deviceLabel,
+			String clientIpMasked,
+			String loginRiskLevel,
 			boolean currentSession,
 			Instant createdAt,
 			Instant lastSeenAt,
@@ -133,6 +176,29 @@ public final class AppContracts {
 	public record PasswordChangeResponse(
 			Instant changedAt,
 			int loggedOutOtherSessions,
+			String message
+	) {
+	}
+
+	public record VerificationChallengeResponse(
+			String challengeCode,
+			String purpose,
+			String accountType,
+			String maskedTarget,
+			String deliveryChannel,
+			String deliveryProvider,
+			String deliveryStatus,
+			Instant expiresAt,
+			String simulatedCode,
+			String message
+	) {
+	}
+
+	public record AccountVerificationStatusResponse(
+			String accountType,
+			String accountIdentifier,
+			boolean verified,
+			Instant verifiedAt,
 			String message
 	) {
 	}
@@ -593,7 +659,11 @@ public final class AppContracts {
 			LocalDate reportDate,
 			List<LabIndicator> indicators,
 			RiskLevel overallRiskLevel,
+			boolean manualConfirmationRequired,
+			boolean reviewReady,
+			String extractionStatus,
 			List<String> suggestions,
+			List<String> trustNotes,
 			String summary
 	) {
 	}
@@ -616,6 +686,9 @@ public final class AppContracts {
 			String reportId,
 			LocalDate reportDate,
 			RiskLevel overallRiskLevel,
+			boolean manualConfirmationRequired,
+			boolean reviewReady,
+			String reviewStatus,
 			String reviewSummary,
 			String comparedReportId,
 			LocalDate comparedReportDate,

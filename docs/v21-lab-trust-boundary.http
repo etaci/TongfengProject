@@ -1,0 +1,65 @@
+@baseUrl = http://localhost:8080
+
+### 1. 先登录开发账号
+POST {{baseUrl}}/api/v1/auth/mock-login
+Content-Type: application/json
+
+{
+  "nickname": "v21-lab-user"
+}
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 上传一份清晰化验单
+POST {{baseUrl}}/api/v1/lab-reports/analyze
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="reportDate"
+
+2026-05-04
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="lab-report-clear.png"
+Content-Type: image/png
+
+< ./lab-report-clear.png
+--WebAppBoundary--
+
+> {%
+client.global.set("report_id_clear", response.body.data.reportId);
+%}
+
+### 3. 查看清晰报告复盘，预期 reviewReady=true
+GET {{baseUrl}}/api/v1/lab-reports/{{report_id_clear}}/review
+Authorization: Bearer {{token}}
+
+### 4. 上传一份模糊或不可识别报告
+POST {{baseUrl}}/api/v1/lab-reports/analyze
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="reportDate"
+
+2026-05-04
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="lab-report-blurry.png"
+Content-Type: image/png
+
+< ./lab-report-blurry.png
+--WebAppBoundary--
+
+> {%
+client.global.set("report_id_blurry", response.body.data.reportId);
+%}
+
+### 5. 查看模糊报告列表态，预期 manualConfirmationRequired=true
+GET {{baseUrl}}/api/v1/lab-reports
+Authorization: Bearer {{token}}
+
+### 6. 查看模糊报告复盘，预期 reviewReady=false 且 comparisons 为空
+GET {{baseUrl}}/api/v1/lab-reports/{{report_id_blurry}}/review
+Authorization: Bearer {{token}}

@@ -1,0 +1,61 @@
+### V24 - 非法邮箱注册
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "nickname": "invalid-email-user",
+  "accountType": "EMAIL",
+  "account": "invalid-email",
+  "password": "Password123",
+  "confirmPassword": "Password123",
+  "consent": {
+    "consentVersion": "v1.0",
+    "privacyPolicyVersion": "privacy-v1.0",
+    "privacyAccepted": true,
+    "termsAccepted": true,
+    "medicalDataAuthorized": true,
+    "familyCollaborationAuthorized": true,
+    "notificationAuthorized": true
+  }
+}
+
+### V24 - 格式化手机号注册
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "nickname": "phone-format-user",
+  "accountType": "PHONE",
+  "account": "+86 138-0013-8000",
+  "password": "Password123",
+  "confirmPassword": "Password123",
+  "consent": {
+    "consentVersion": "v1.0",
+    "privacyPolicyVersion": "privacy-v1.0",
+    "privacyAccepted": true,
+    "termsAccepted": true,
+    "medicalDataAuthorized": true,
+    "familyCollaborationAuthorized": true,
+    "notificationAuthorized": true
+  }
+}
+
+### V24 - 连续输错密码触发锁定
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "accountType": "EMAIL",
+  "account": "locked-user@example.com",
+  "password": "WrongPassword123"
+}
+
+### V24 - 锁定后再次登录
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "accountType": "EMAIL",
+  "account": "locked-user@example.com",
+  "password": "Password123"
+}

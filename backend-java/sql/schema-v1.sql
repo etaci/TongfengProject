@@ -29,6 +29,12 @@ CREATE TABLE auth_session (
     auth_mode VARCHAR(32) NOT NULL,
     account_type VARCHAR(32) NULL,
     account_identifier VARCHAR(128) NULL,
+    device_fingerprint_hash VARCHAR(128) NULL,
+    device_label VARCHAR(128) NULL,
+    client_ip_hash VARCHAR(128) NULL,
+    client_ip_masked VARCHAR(64) NULL,
+    login_risk_level VARCHAR(16) NULL,
+    security_notices_json VARCHAR(1000) NULL,
     privacy_consent_completed BIT NOT NULL,
     token VARCHAR(128) NOT NULL UNIQUE,
     expires_at DATETIME NOT NULL,
@@ -49,10 +55,37 @@ CREATE TABLE auth_identity (
     password_salt VARCHAR(128) NOT NULL,
     status VARCHAR(32) NOT NULL,
     last_login_at DATETIME NULL,
+    verified_at DATETIME NULL,
+    failed_login_count INT NOT NULL,
+    last_failed_login_at DATETIME NULL,
+    locked_until DATETIME NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     KEY idx_auth_identity_user_code (user_code),
     KEY idx_auth_identity_principal_status (principal_value, status)
+);
+
+CREATE TABLE auth_verification_challenge (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    challenge_code VARCHAR(64) NOT NULL UNIQUE,
+    user_code VARCHAR(64) NULL,
+    purpose VARCHAR(32) NOT NULL,
+    account_type VARCHAR(32) NOT NULL,
+    principal_value VARCHAR(128) NOT NULL,
+    masked_target VARCHAR(128) NOT NULL,
+    verification_code_hash VARCHAR(128) NOT NULL,
+    verification_code_salt VARCHAR(128) NOT NULL,
+    delivery_channel VARCHAR(32) NOT NULL,
+    delivery_provider VARCHAR(32) NOT NULL,
+    delivery_status VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    attempt_count INT NOT NULL,
+    last_attempt_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    KEY idx_auth_verification_challenge_code (challenge_code),
+    KEY idx_auth_verification_principal_purpose (principal_value, purpose, status)
 );
 
 CREATE TABLE privacy_consent_record (

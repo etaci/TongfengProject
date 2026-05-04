@@ -9,6 +9,8 @@ public interface ReminderEventRepository extends JpaRepository<ReminderEventEnti
 
 	List<ReminderEventEntity> findByUserCodeAndStatusOrderByTriggerAtDesc(String userCode, String status);
 
+	boolean existsByUserCodeAndDedupKey(String userCode, String dedupKey);
+
 	@Transactional
 	void deleteByUserCodeAndStatus(String userCode, String status);
 }

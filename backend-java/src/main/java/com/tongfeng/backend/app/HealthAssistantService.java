@@ -3,6 +3,7 @@ package com.tongfeng.backend.app;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.tongfeng.backend.app.persistence.entity.AuthIdentityEntity;
 import com.tongfeng.backend.app.persistence.entity.AuthSessionEntity;
+import com.tongfeng.backend.app.persistence.entity.AuthVerificationChallengeEntity;
 import com.tongfeng.backend.app.persistence.entity.FlareRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.HydrationRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.LabReportRecordEntity;
@@ -10,6 +11,7 @@ import com.tongfeng.backend.app.persistence.entity.MealRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.MedicationCheckinEntity;
 import com.tongfeng.backend.app.persistence.entity.MedicationPlanEntity;
 import com.tongfeng.backend.app.persistence.entity.PrivacyConsentRecordEntity;
+import com.tongfeng.backend.app.persistence.entity.ReminderEventEntity;
 import com.tongfeng.backend.app.persistence.entity.StoredFileEntity;
 import com.tongfeng.backend.app.persistence.entity.UricAcidRecordEntity;
 import com.tongfeng.backend.app.persistence.entity.UserAccountEntity;
@@ -17,6 +19,7 @@ import com.tongfeng.backend.app.persistence.entity.UserProfileEntity;
 import com.tongfeng.backend.app.persistence.entity.WeightRecordEntity;
 import com.tongfeng.backend.app.persistence.repo.AuthIdentityRepository;
 import com.tongfeng.backend.app.persistence.repo.AuthSessionRepository;
+import com.tongfeng.backend.app.persistence.repo.AuthVerificationChallengeRepository;
 import com.tongfeng.backend.app.persistence.repo.FlareRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.HydrationRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.LabReportRecordRepository;
@@ -24,17 +27,23 @@ import com.tongfeng.backend.app.persistence.repo.MealRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.MedicationCheckinRepository;
 import com.tongfeng.backend.app.persistence.repo.MedicationPlanRepository;
 import com.tongfeng.backend.app.persistence.repo.PrivacyConsentRecordRepository;
+import com.tongfeng.backend.app.persistence.repo.ReminderEventRepository;
 import com.tongfeng.backend.app.persistence.repo.StoredFileRepository;
 import com.tongfeng.backend.app.persistence.repo.UricAcidRecordRepository;
 import com.tongfeng.backend.app.persistence.repo.UserAccountRepository;
 import com.tongfeng.backend.app.persistence.repo.UserProfileRepository;
 import com.tongfeng.backend.app.persistence.repo.WeightRecordRepository;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,6 +52,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -62,6 +73,8 @@ public class HealthAssistantService {
 	};
 	private static final TypeReference<List<AppContracts.MedicationItem>> MEDICATION_ITEM_LIST_TYPE = new TypeReference<>() {
 	};
+	private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$");
+	private static final Pattern CHINA_MAINLAND_PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
 
 	private record DailyMedicationStats(
 			int plannedDoseCount,
@@ -72,11 +85,23 @@ public class HealthAssistantService {
 	) {
 	}
 
+	private record LoginSecurityAssessment(
+			String deviceFingerprintHash,
+			String deviceLabel,
+			String clientIpHash,
+			String clientIpMasked,
+			String riskLevel,
+			List<String> securityNotices
+	) {
+	}
+
 	private final UserAccountRepository userAccountRepository;
 	private final UserProfileRepository userProfileRepository;
 	private final AuthIdentityRepository authIdentityRepository;
 	private final AuthSessionRepository authSessionRepository;
+	private final AuthVerificationChallengeRepository authVerificationChallengeRepository;
 	private final PrivacyConsentRecordRepository privacyConsentRecordRepository;
+	private final ReminderEventRepository reminderEventRepository;
 	private final StoredFileRepository storedFileRepository;
 	private final MealRecordRepository mealRecordRepository;
 	private final UricAcidRecordRepository uricAcidRecordRepository;
@@ -92,6 +117,7 @@ public class HealthAssistantService {
 	private final IdGenerator idGenerator;
 	private final JsonCodec jsonCodec;
 	private final PasswordHashService passwordHashService;
+	private final VerificationDeliveryService verificationDeliveryService;
 	private final SessionCacheService sessionCacheService;
 	private final HealthRuleEngineService healthRuleEngineService;
 	private final ProactiveCareService proactiveCareService;
@@ -105,7 +131,9 @@ public class HealthAssistantService {
 			UserProfileRepository userProfileRepository,
 			AuthIdentityRepository authIdentityRepository,
 			AuthSessionRepository authSessionRepository,
+			AuthVerificationChallengeRepository authVerificationChallengeRepository,
 			PrivacyConsentRecordRepository privacyConsentRecordRepository,
+			ReminderEventRepository reminderEventRepository,
 			StoredFileRepository storedFileRepository,
 			MealRecordRepository mealRecordRepository,
 			UricAcidRecordRepository uricAcidRecordRepository,
@@ -121,6 +149,7 @@ public class HealthAssistantService {
 			IdGenerator idGenerator,
 			JsonCodec jsonCodec,
 			PasswordHashService passwordHashService,
+			VerificationDeliveryService verificationDeliveryService,
 			SessionCacheService sessionCacheService,
 			HealthRuleEngineService healthRuleEngineService,
 			ProactiveCareService proactiveCareService,
@@ -133,7 +162,9 @@ public class HealthAssistantService {
 		this.userProfileRepository = userProfileRepository;
 		this.authIdentityRepository = authIdentityRepository;
 		this.authSessionRepository = authSessionRepository;
+		this.authVerificationChallengeRepository = authVerificationChallengeRepository;
 		this.privacyConsentRecordRepository = privacyConsentRecordRepository;
+		this.reminderEventRepository = reminderEventRepository;
 		this.storedFileRepository = storedFileRepository;
 		this.mealRecordRepository = mealRecordRepository;
 		this.uricAcidRecordRepository = uricAcidRecordRepository;
@@ -149,6 +180,7 @@ public class HealthAssistantService {
 		this.idGenerator = idGenerator;
 		this.jsonCodec = jsonCodec;
 		this.passwordHashService = passwordHashService;
+		this.verificationDeliveryService = verificationDeliveryService;
 		this.sessionCacheService = sessionCacheService;
 		this.healthRuleEngineService = healthRuleEngineService;
 		this.proactiveCareService = proactiveCareService;
@@ -159,7 +191,7 @@ public class HealthAssistantService {
 	}
 
 	@Transactional
-	public AppContracts.AuthTokenResponse mockLogin(AppContracts.MockLoginRequest request) {
+	public AppContracts.AuthTokenResponse mockLogin(AppContracts.MockLoginRequest request, AuthRequestContext requestContext) {
 		String userId = idGenerator.next("user");
 		Instant now = Instant.now();
 		UserAccountEntity accountEntity = new UserAccountEntity();
@@ -185,13 +217,15 @@ public class HealthAssistantService {
 				"MOCK",
 				"DEMO",
 				request.nickname(),
+				buildLoginSecurityAssessment(userId, "MOCK", requestContext),
+				false,
 				false
 		);
 		return tokenResponse;
 	}
 
 	@Transactional
-	public AppContracts.AuthTokenResponse register(AppContracts.RegisterRequest request) {
+	public AppContracts.AuthTokenResponse register(AppContracts.RegisterRequest request, AuthRequestContext requestContext) {
 		String accountType = normalizeAccountType(request.accountType());
 		String principal = normalizePrincipal(accountType, request.account());
 		validatePassword(request.password(), request.confirmPassword());
@@ -228,6 +262,10 @@ public class HealthAssistantService {
 		identityEntity.setPasswordHash(hashedPassword.hash());
 		identityEntity.setPasswordSalt(hashedPassword.salt());
 		identityEntity.setStatus("ACTIVE");
+		identityEntity.setVerifiedAt(null);
+		identityEntity.setFailedLoginCount(0);
+		identityEntity.setLastFailedLoginAt(null);
+		identityEntity.setLockedUntil(null);
 		identityEntity.setCreatedAt(now);
 		identityEntity.setUpdatedAt(now);
 		authIdentityRepository.save(identityEntity);
@@ -239,12 +277,14 @@ public class HealthAssistantService {
 				"PASSWORD",
 				accountType,
 				principal,
+				buildLoginSecurityAssessment(userId, "PASSWORD", requestContext),
+				false,
 				true
 		);
 	}
 
-	@Transactional
-	public AppContracts.AuthTokenResponse login(AppContracts.LoginRequest request) {
+	@Transactional(noRollbackFor = BusinessException.class)
+	public AppContracts.AuthTokenResponse login(AppContracts.LoginRequest request, AuthRequestContext requestContext) {
 		String accountType = normalizeAccountType(request.accountType());
 		String principal = normalizePrincipal(accountType, request.account());
 		AuthIdentityEntity identityEntity = authIdentityRepository.findByPrincipalValueAndStatus(principal, "ACTIVE")
@@ -252,9 +292,12 @@ public class HealthAssistantService {
 		if (!Objects.equals(identityEntity.getAccountType(), accountType)) {
 			throw new BusinessException("ACCOUNT_TYPE_MISMATCH", "账号类型不匹配，请确认使用邮箱还是手机号登录");
 		}
+		ensureIdentityNotLocked(identityEntity);
 		if (!passwordHashService.matches(request.password(), identityEntity.getPasswordSalt(), identityEntity.getPasswordHash())) {
+			handleFailedLogin(identityEntity);
 			throw new BusinessException("INVALID_CREDENTIALS", "账号或密码不正确");
 		}
+		resetFailedLoginState(identityEntity);
 		UserAccountEntity accountEntity = ensureAccount(identityEntity.getUserCode());
 		boolean privacyConsentCompleted = hasCompletedPrivacyConsent(identityEntity.getUserCode());
 		if (!privacyConsentCompleted) {
@@ -263,14 +306,114 @@ public class HealthAssistantService {
 		identityEntity.setLastLoginAt(Instant.now());
 		identityEntity.setUpdatedAt(Instant.now());
 		authIdentityRepository.save(identityEntity);
+		LoginSecurityAssessment securityAssessment = buildLoginSecurityAssessment(accountEntity.getUserCode(), "PASSWORD", requestContext);
+		publishLoginRiskReminder(accountEntity.getUserCode(), accountEntity.getNickname(), securityAssessment);
 		return createAuthSessionResponse(
 				accountEntity.getUserCode(),
 				accountEntity.getNickname(),
 				"PASSWORD",
 				accountType,
 				principal,
+				securityAssessment,
+				isAccountVerified(identityEntity),
 				true
 		);
+	}
+
+	@Transactional
+	public AppContracts.VerificationChallengeResponse requestVerificationCode(AppContracts.VerificationCodeRequest request) {
+		String purpose = normalizeVerificationPurpose(request.purpose());
+		String accountType = normalizeAccountType(request.accountType());
+		String principal = normalizePrincipal(accountType, request.account());
+		AuthIdentityEntity identityEntity = authIdentityRepository.findByPrincipalValueAndStatus(principal, "ACTIVE").orElse(null);
+
+		if ("PASSWORD_RESET".equals(purpose) && identityEntity == null) {
+			return new AppContracts.VerificationChallengeResponse(
+					null,
+					purpose,
+					accountType,
+					maskPrincipal(accountType, principal),
+					deliveryChannel(accountType),
+					"GENERIC",
+					"SIMULATED",
+					Instant.now().plus(appProperties.getAuthVerificationCodeMinutes(), ChronoUnit.MINUTES),
+					null,
+					"如果该账号已存在，验证码已按当前骨架模式发出，请继续下一步。"
+			);
+		}
+
+		if (identityEntity != null && !Objects.equals(identityEntity.getAccountType(), accountType)) {
+			throw new BusinessException("ACCOUNT_TYPE_MISMATCH", "账号类型不匹配，请确认使用邮箱还是手机号");
+		}
+		String userId = identityEntity == null ? null : identityEntity.getUserCode();
+		return createVerificationChallenge(userId, purpose, accountType, principal);
+	}
+
+	@Transactional
+	public AppContracts.AuthLogoutResponse confirmPasswordReset(AppContracts.PasswordResetConfirmRequest request) {
+		String accountType = normalizeAccountType(request.accountType());
+		String principal = normalizePrincipal(accountType, request.account());
+		validatePassword(request.newPassword(), request.confirmPassword());
+		AuthIdentityEntity identityEntity = authIdentityRepository.findByPrincipalValueAndStatus(principal, "ACTIVE")
+				.orElseThrow(() -> new BusinessException("ACCOUNT_NOT_FOUND", "账号不存在或已停用"));
+		if (!Objects.equals(identityEntity.getAccountType(), accountType)) {
+			throw new BusinessException("ACCOUNT_TYPE_MISMATCH", "账号类型不匹配，请确认使用邮箱还是手机号");
+		}
+		AuthVerificationChallengeEntity challengeEntity = verifyChallenge(principal, "PASSWORD_RESET", request.verificationCode());
+		PasswordHashService.HashedPassword hashedPassword = passwordHashService.hash(request.newPassword());
+		identityEntity.setPasswordHash(hashedPassword.hash());
+		identityEntity.setPasswordSalt(hashedPassword.salt());
+		identityEntity.setUpdatedAt(Instant.now());
+		authIdentityRepository.save(identityEntity);
+		logoutAllSessions(identityEntity.getUserCode());
+		markChallengeUsed(challengeEntity);
+		return new AppContracts.AuthLogoutResponse(Instant.now(), "密码已重置，请使用新密码重新登录");
+	}
+
+	public AppContracts.AccountVerificationStatusResponse getAccountVerificationStatus(String userId, String token) {
+		UserSession session = requireOwnedSession(userId, token);
+		return buildAccountVerificationStatusResponse(findPasswordIdentity(userId, session.accountType(), session.accountIdentifier()));
+	}
+
+	@Transactional
+	public AppContracts.VerificationChallengeResponse requestAccountVerificationCode(String userId, String token) {
+		UserSession session = requireOwnedSession(userId, token);
+		if (!"PASSWORD".equals(session.authMode())) {
+			throw new BusinessException("ACCOUNT_VERIFICATION_NOT_SUPPORTED", "当前登录方式不支持账号验证");
+		}
+		AuthIdentityEntity identityEntity = findPasswordIdentity(userId, session.accountType(), session.accountIdentifier());
+		if (isAccountVerified(identityEntity)) {
+			return new AppContracts.VerificationChallengeResponse(
+					null,
+					"ACCOUNT_VERIFY",
+					identityEntity.getAccountType(),
+					maskPrincipal(identityEntity.getAccountType(), identityEntity.getPrincipalValue()),
+					deliveryChannel(identityEntity.getAccountType()),
+					"ACCOUNT_IDENTITY",
+					"ALREADY_VERIFIED",
+					Instant.now(),
+					null,
+					"当前账号已经完成验证，无需重复操作"
+			);
+		}
+		return createVerificationChallenge(userId, "ACCOUNT_VERIFY", identityEntity.getAccountType(), identityEntity.getPrincipalValue());
+	}
+
+	@Transactional
+	public AppContracts.AccountVerificationStatusResponse confirmAccountVerification(
+			String userId,
+			String token,
+			AppContracts.VerificationCodeConfirmRequest request
+	) {
+		UserSession session = requireOwnedSession(userId, token);
+		AuthIdentityEntity identityEntity = findPasswordIdentity(userId, session.accountType(), session.accountIdentifier());
+		AuthVerificationChallengeEntity challengeEntity = verifyChallenge(identityEntity.getPrincipalValue(), "ACCOUNT_VERIFY", request.verificationCode());
+		identityEntity.setVerifiedAt(Instant.now());
+		identityEntity.setUpdatedAt(Instant.now());
+		authIdentityRepository.save(identityEntity);
+		markChallengeUsed(challengeEntity);
+		refreshUserSessionsVerification(userId, true);
+		return buildAccountVerificationStatusResponse(identityEntity);
 	}
 
 	@Transactional
@@ -312,6 +455,11 @@ public class HealthAssistantService {
 				session.authMode(),
 				session.accountType(),
 				session.accountIdentifier(),
+				session.deviceLabel(),
+				session.clientIpMasked(),
+				session.loginRiskLevel(),
+				session.securityNotices(),
+				session.accountVerified(),
 				session.privacyConsentCompleted(),
 				session.createdAt(),
 				session.lastSeenAt(),
@@ -952,6 +1100,38 @@ public class HealthAssistantService {
 				.orElse(null);
 
 		List<AppContracts.LabIndicator> currentIndicators = readIndicators(report.getIndicatorsJson());
+		if (!isLabReviewReady(currentIndicators)) {
+			List<String> trustNotes = buildLabTrustNotes(previousReport, currentIndicators);
+			List<String> nextActions = List.of(
+					"重新上传更清晰的化验单图片或 PDF，优先确保指标名称、数值和单位完整可见。",
+					"如果 OCR 仍不稳定，请手动核对关键指标后再继续复盘。",
+					"在人工确认前，不要把当前结果当作正式化验结论或趋势依据。"
+			);
+			return new AppContracts.LabReportReviewResponse(
+					report.getReportCode(),
+					report.getReportDate(),
+					toRiskLevel(report.getOverallRiskLevel()),
+					true,
+					false,
+					"MANUAL_CONFIRMATION_REQUIRED",
+					"当前报告未能稳定识别出可复盘的关键指标，系统已阻断自动目标判断和趋势复盘，请先人工确认。",
+					previousReport == null ? null : previousReport.getReportCode(),
+					previousReport == null ? null : previousReport.getReportDate(),
+					previousReport == null ? null : (int) ChronoUnit.DAYS.between(previousReport.getReportDate(), report.getReportDate()),
+					profile.getTargetUricAcid(),
+					null,
+					null,
+					false,
+					"当前不输出目标值结论，需先人工确认指标后再生成正式复盘。",
+					List.of(),
+					List.of("系统未稳定识别到关键指标，已停止自动趋势和目标值判断。"),
+					"请先完成人工确认，再决定是否需要重拍、补录或尽快咨询医生。",
+					nextActions,
+					trustNotes,
+					Instant.now()
+			);
+		}
+
 		List<AppContracts.LabIndicator> previousIndicators = previousReport == null
 				? List.of()
 				: readIndicators(previousReport.getIndicatorsJson());
@@ -988,6 +1168,9 @@ public class HealthAssistantService {
 				report.getReportCode(),
 				report.getReportDate(),
 				toRiskLevel(report.getOverallRiskLevel()),
+				false,
+				true,
+				"READY",
 				buildLabReviewSummary(report, currentUricAcid, previousUricAcid, targetUricAcidValue, previousReport),
 				previousReport == null ? null : previousReport.getReportCode(),
 				previousReport == null ? null : previousReport.getReportDate(),
@@ -1976,6 +2159,393 @@ public class HealthAssistantService {
 		return value.trim();
 	}
 
+	private AppContracts.VerificationChallengeResponse createVerificationChallenge(
+			String userId,
+			String purpose,
+			String accountType,
+			String principal
+	) {
+		enforceVerificationRequestRateLimit(principal, purpose);
+		expirePendingChallenges(principal, purpose);
+		Instant now = Instant.now();
+		Instant expiresAt = now.plus(appProperties.getAuthVerificationCodeMinutes(), ChronoUnit.MINUTES);
+		String verificationCode = generateVerificationCode();
+		PasswordHashService.HashedPassword hashedCode = passwordHashService.hash(verificationCode);
+		String maskedTarget = maskPrincipal(accountType, principal);
+		VerificationDeliveryService.DeliveryResult deliveryResult = verificationDeliveryService.deliver(
+				purpose,
+				accountType,
+				principal,
+				maskedTarget,
+				verificationCode,
+				expiresAt
+		);
+
+		AuthVerificationChallengeEntity entity = new AuthVerificationChallengeEntity();
+		entity.setChallengeCode(idGenerator.next("verify"));
+		entity.setUserCode(userId);
+		entity.setPurpose(purpose);
+		entity.setAccountType(accountType);
+		entity.setPrincipalValue(principal);
+		entity.setMaskedTarget(maskedTarget);
+		entity.setVerificationCodeHash(hashedCode.hash());
+		entity.setVerificationCodeSalt(hashedCode.salt());
+		entity.setDeliveryChannel(deliveryResult.deliveryChannel());
+		entity.setDeliveryProvider(deliveryResult.deliveryProvider());
+		entity.setDeliveryStatus(deliveryResult.deliveryStatus());
+		entity.setStatus("PENDING");
+		entity.setExpiresAt(expiresAt);
+		entity.setAttemptCount(0);
+		entity.setCreatedAt(now);
+		authVerificationChallengeRepository.save(entity);
+
+		return new AppContracts.VerificationChallengeResponse(
+				entity.getChallengeCode(),
+				purpose,
+				accountType,
+				entity.getMaskedTarget(),
+				entity.getDeliveryChannel(),
+				entity.getDeliveryProvider(),
+				entity.getDeliveryStatus(),
+				expiresAt,
+				deliveryResult.exposedCode(),
+				deliveryResult.message()
+		);
+	}
+
+	private void enforceVerificationRequestRateLimit(String principal, String purpose) {
+		Instant now = Instant.now();
+		authVerificationChallengeRepository.findFirstByPrincipalValueAndPurposeOrderByCreatedAtDesc(principal, purpose)
+				.ifPresent(latest -> {
+					long elapsedSeconds = ChronoUnit.SECONDS.between(latest.getCreatedAt(), now);
+					if (elapsedSeconds < appProperties.getAuthVerificationResendCooldownSeconds()) {
+						long retryAfter = appProperties.getAuthVerificationResendCooldownSeconds() - elapsedSeconds;
+						throw new BusinessException("VERIFICATION_CODE_COOLDOWN", "请求过于频繁，请在 " + retryAfter + " 秒后再试");
+					}
+				});
+		Instant windowStart = now.minus(appProperties.getAuthVerificationRateLimitWindowMinutes(), ChronoUnit.MINUTES);
+		long recentCount = authVerificationChallengeRepository.countByPrincipalValueAndPurposeAndCreatedAtAfter(
+				principal,
+				purpose,
+				windowStart
+		);
+		if (recentCount >= appProperties.getAuthVerificationMaxRequestsPerWindow()) {
+			throw new BusinessException(
+					"VERIFICATION_CODE_RATE_LIMITED",
+					"当前账号在最近 " + appProperties.getAuthVerificationRateLimitWindowMinutes() + " 分钟内请求次数过多，请稍后再试"
+			);
+		}
+	}
+
+	private void expirePendingChallenges(String principal, String purpose) {
+		List<AuthVerificationChallengeEntity> pendingChallenges = authVerificationChallengeRepository
+				.findByPrincipalValueAndPurposeAndStatus(principal, purpose, "PENDING");
+		Instant now = Instant.now();
+		for (AuthVerificationChallengeEntity item : pendingChallenges) {
+			item.setStatus(item.getExpiresAt().isBefore(now) ? "EXPIRED" : "SUPERSEDED");
+		}
+		if (!pendingChallenges.isEmpty()) {
+			authVerificationChallengeRepository.saveAll(pendingChallenges);
+		}
+	}
+
+	private AuthVerificationChallengeEntity verifyChallenge(String principal, String purpose, String verificationCode) {
+		AuthVerificationChallengeEntity entity = authVerificationChallengeRepository
+				.findFirstByPrincipalValueAndPurposeAndStatusOrderByCreatedAtDesc(principal, purpose, "PENDING")
+				.orElseThrow(() -> new BusinessException("VERIFICATION_CODE_NOT_FOUND", "当前没有可用验证码，请先重新获取"));
+		if (entity.getExpiresAt().isBefore(Instant.now())) {
+			entity.setStatus("EXPIRED");
+			authVerificationChallengeRepository.save(entity);
+			throw new BusinessException("VERIFICATION_CODE_EXPIRED", "验证码已过期，请重新获取");
+		}
+		if (!passwordHashService.matches(verificationCode, entity.getVerificationCodeSalt(), entity.getVerificationCodeHash())) {
+			throw new BusinessException("VERIFICATION_CODE_INVALID", "验证码不正确，请重新输入");
+		}
+		return entity;
+	}
+
+	private void markChallengeUsed(AuthVerificationChallengeEntity entity) {
+		entity.setStatus("USED");
+		entity.setUsedAt(Instant.now());
+		authVerificationChallengeRepository.save(entity);
+	}
+
+	private void logoutAllSessions(String userId) {
+		List<AuthSessionEntity> sessions = authSessionRepository.findByUserCodeOrderByLastSeenAtDescCreatedAtDesc(userId);
+		authSessionRepository.deleteAll(sessions);
+		sessions.forEach(item -> sessionCacheService.evict(item.getToken()));
+	}
+
+	private void refreshUserSessionsVerification(String userId, boolean accountVerified) {
+		List<AuthSessionEntity> sessions = authSessionRepository.findByUserCodeOrderByLastSeenAtDescCreatedAtDesc(userId);
+		for (AuthSessionEntity session : sessions) {
+			UserSession current = toUserSession(session);
+			sessionCacheService.put(new UserSession(
+					current.sessionCode(),
+					current.userId(),
+					current.nickname(),
+					current.authMode(),
+					current.accountType(),
+					current.accountIdentifier(),
+					current.deviceLabel(),
+					current.clientIpMasked(),
+					current.loginRiskLevel(),
+					current.securityNotices(),
+					accountVerified,
+					current.privacyConsentCompleted(),
+					current.createdAt(),
+					current.lastSeenAt(),
+					current.token(),
+					current.expiresAt()
+			));
+		}
+	}
+
+	private AuthIdentityEntity findPasswordIdentity(String userId, String accountType, String principal) {
+		return authIdentityRepository.findByUserCodeAndAccountTypeAndPrincipalValueAndStatus(
+				userId,
+				accountType,
+				principal,
+				"ACTIVE"
+		).orElseThrow(() -> new BusinessException("ACCOUNT_NOT_FOUND", "当前账号不存在或已停用"));
+	}
+
+	private AppContracts.AccountVerificationStatusResponse buildAccountVerificationStatusResponse(AuthIdentityEntity identityEntity) {
+		return new AppContracts.AccountVerificationStatusResponse(
+				identityEntity.getAccountType(),
+				identityEntity.getPrincipalValue(),
+				isAccountVerified(identityEntity),
+				identityEntity.getVerifiedAt(),
+				isAccountVerified(identityEntity) ? "当前账号已完成验证" : "当前账号尚未完成验证"
+		);
+	}
+
+	private boolean resolveAccountVerified(String userId, String accountType, String principal) {
+		if (!StringUtils.hasText(accountType) || !StringUtils.hasText(principal)) {
+			return false;
+		}
+		return authIdentityRepository.findByUserCodeAndAccountTypeAndPrincipalValueAndStatus(userId, accountType, principal, "ACTIVE")
+				.map(this::isAccountVerified)
+				.orElse(false);
+	}
+
+	private boolean isAccountVerified(AuthIdentityEntity identityEntity) {
+		return identityEntity != null && identityEntity.getVerifiedAt() != null;
+	}
+
+	private void ensureIdentityNotLocked(AuthIdentityEntity identityEntity) {
+		if (identityEntity == null || identityEntity.getLockedUntil() == null) {
+			return;
+		}
+		Instant now = Instant.now();
+		if (identityEntity.getLockedUntil().isAfter(now)) {
+			long minutes = Math.max(1, ChronoUnit.MINUTES.between(now, identityEntity.getLockedUntil()) + 1);
+			throw new BusinessException("ACCOUNT_LOGIN_LOCKED", "登录失败次数过多，请在 " + minutes + " 分钟后再试");
+		}
+		identityEntity.setLockedUntil(null);
+		identityEntity.setFailedLoginCount(0);
+		authIdentityRepository.save(identityEntity);
+	}
+
+	private void handleFailedLogin(AuthIdentityEntity identityEntity) {
+		Instant now = Instant.now();
+		int failedCount = identityEntity.getFailedLoginCount() + 1;
+		identityEntity.setFailedLoginCount(failedCount);
+		identityEntity.setLastFailedLoginAt(now);
+		if (failedCount >= appProperties.getAuthLoginFailureThreshold()) {
+			identityEntity.setLockedUntil(now.plus(appProperties.getAuthLoginFailureLockMinutes(), ChronoUnit.MINUTES));
+		}
+		identityEntity.setUpdatedAt(now);
+		authIdentityRepository.save(identityEntity);
+	}
+
+	private void resetFailedLoginState(AuthIdentityEntity identityEntity) {
+		if (identityEntity.getFailedLoginCount() == 0
+				&& identityEntity.getLastFailedLoginAt() == null
+				&& identityEntity.getLockedUntil() == null) {
+			return;
+		}
+		identityEntity.setFailedLoginCount(0);
+		identityEntity.setLastFailedLoginAt(null);
+		identityEntity.setLockedUntil(null);
+		authIdentityRepository.save(identityEntity);
+	}
+
+	private String normalizeVerificationPurpose(String value) {
+		if (!StringUtils.hasText(value)) {
+			throw new BusinessException("VERIFICATION_PURPOSE_REQUIRED", "验证码用途不能为空");
+		}
+		String normalized = value.trim().toUpperCase(Locale.ROOT);
+		if (Set.of("PASSWORD_RESET", "ACCOUNT_VERIFY").contains(normalized)) {
+			return normalized;
+		}
+		throw new BusinessException("VERIFICATION_PURPOSE_INVALID", "当前仅支持 PASSWORD_RESET 或 ACCOUNT_VERIFY");
+	}
+
+	private String deliveryChannel(String accountType) {
+		return "EMAIL".equals(accountType) ? "EMAIL" : "SMS";
+	}
+
+	private String generateVerificationCode() {
+		return String.valueOf(ThreadLocalRandom.current().nextInt(100000, 1000000));
+	}
+
+	private String maskPrincipal(String accountType, String principal) {
+		if (!StringUtils.hasText(principal)) {
+			return "";
+		}
+		if ("EMAIL".equals(accountType)) {
+			int atIndex = principal.indexOf('@');
+			if (atIndex <= 1) {
+				return "***" + principal.substring(Math.max(atIndex, 0));
+			}
+			return principal.substring(0, 1) + "***" + principal.substring(atIndex);
+		}
+		if (principal.length() <= 4) {
+			return "***";
+		}
+		return principal.substring(0, 3) + "****" + principal.substring(principal.length() - 2);
+	}
+
+	private LoginSecurityAssessment buildLoginSecurityAssessment(String userId, String authMode, AuthRequestContext requestContext) {
+		String deviceFingerprintHash = hashValue(resolveDeviceFingerprint(requestContext));
+		String deviceLabel = resolveDeviceLabel(requestContext);
+		String clientIpHash = hashValue(requestContext == null ? null : requestContext.clientIp());
+		String clientIpMasked = maskIpAddress(requestContext == null ? null : requestContext.clientIp());
+		if (!"PASSWORD".equals(authMode)) {
+			return new LoginSecurityAssessment(
+					deviceFingerprintHash,
+					deviceLabel,
+					clientIpHash,
+					clientIpMasked,
+					"GREEN",
+					List.of()
+			);
+		}
+		Instant knownDeviceWindow = Instant.now().minus(appProperties.getAuthKnownDeviceDays(), ChronoUnit.DAYS);
+		List<AuthSessionEntity> recentSessions = authSessionRepository.findByUserCodeAndCreatedAtAfterOrderByCreatedAtDesc(userId, knownDeviceWindow);
+		if (recentSessions.isEmpty()) {
+			return new LoginSecurityAssessment(
+					deviceFingerprintHash,
+					deviceLabel,
+					clientIpHash,
+					clientIpMasked,
+					"GREEN",
+					List.of()
+			);
+		}
+		boolean newDevice = StringUtils.hasText(deviceFingerprintHash)
+				&& recentSessions.stream().noneMatch(item -> Objects.equals(item.getDeviceFingerprintHash(), deviceFingerprintHash));
+		boolean newIp = StringUtils.hasText(clientIpHash)
+				&& recentSessions.stream().noneMatch(item -> Objects.equals(item.getClientIpHash(), clientIpHash));
+		List<String> notices = new ArrayList<>();
+		String riskLevel = "GREEN";
+		if (newDevice && newIp) {
+			riskLevel = "RED";
+			notices.add("检测到新的设备和新的网络环境登录，请尽快确认是否为本人操作。");
+		} else if (newDevice) {
+			riskLevel = "YELLOW";
+			notices.add("检测到新的设备登录：" + defaultString(deviceLabel, "未知设备") + "。");
+		} else if (newIp) {
+			riskLevel = "YELLOW";
+			notices.add("检测到新的登录网络：" + defaultString(clientIpMasked, "未知 IP") + "。");
+		}
+		return new LoginSecurityAssessment(
+				deviceFingerprintHash,
+				deviceLabel,
+				clientIpHash,
+				clientIpMasked,
+				riskLevel,
+				notices
+		);
+	}
+
+	private void publishLoginRiskReminder(String userId, String nickname, LoginSecurityAssessment assessment) {
+		if (assessment == null || "GREEN".equals(assessment.riskLevel()) || assessment.securityNotices().isEmpty()) {
+			return;
+		}
+		String dedupKey = ("auth-risk:" + userId + ":" + defaultString(assessment.deviceFingerprintHash(), "none")
+				+ ":" + defaultString(assessment.clientIpHash(), "none"));
+		if (dedupKey.length() > 120) {
+			dedupKey = dedupKey.substring(0, 120);
+		}
+		if (reminderEventRepository.existsByUserCodeAndDedupKey(userId, dedupKey)) {
+			return;
+		}
+		Instant now = Instant.now();
+		ReminderEventEntity entity = new ReminderEventEntity();
+		entity.setReminderCode(idGenerator.next("reminder"));
+		entity.setUserCode(userId);
+		entity.setType("ACCOUNT_SECURITY");
+		entity.setTitle("检测到账号安全风险");
+		entity.setContent((nickname == null ? "当前账号" : nickname) + " 本次登录触发了设备或网络变更提醒，请尽快确认是否为本人操作。");
+		entity.setRiskLevel(assessment.riskLevel());
+		entity.setTriggerAt(now);
+		entity.setSourceType("AUTH_SECURITY");
+		entity.setStatus("ACTIVE");
+		entity.setDedupKey(dedupKey);
+		entity.setCreatedAt(now);
+		entity.setUpdatedAt(now);
+		reminderEventRepository.save(entity);
+	}
+
+	private String resolveDeviceFingerprint(AuthRequestContext requestContext) {
+		if (requestContext == null) {
+			return null;
+		}
+		if (StringUtils.hasText(requestContext.deviceFingerprint())) {
+			return requestContext.deviceFingerprint().trim();
+		}
+		return requestContext.userAgent();
+	}
+
+	private String resolveDeviceLabel(AuthRequestContext requestContext) {
+		if (requestContext == null) {
+			return "未知设备";
+		}
+		if (StringUtils.hasText(requestContext.deviceLabel())) {
+			return requestContext.deviceLabel().trim();
+		}
+		if (StringUtils.hasText(requestContext.userAgent())) {
+			String userAgent = requestContext.userAgent().trim();
+			return userAgent.length() > 120 ? userAgent.substring(0, 120) : userAgent;
+		}
+		return "未知设备";
+	}
+
+	private String hashValue(String rawValue) {
+		if (!StringUtils.hasText(rawValue)) {
+			return null;
+		}
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			byte[] bytes = digest.digest(rawValue.trim().getBytes(StandardCharsets.UTF_8));
+			return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+		} catch (NoSuchAlgorithmException ex) {
+			throw new BusinessException("AUTH_HASH_ERROR", "账号安全指纹生成失败");
+		}
+	}
+
+	private String maskIpAddress(String rawIp) {
+		if (!StringUtils.hasText(rawIp)) {
+			return "";
+		}
+		String ip = rawIp.trim();
+		if (ip.contains(".")) {
+			String[] parts = ip.split("\\.");
+			if (parts.length == 4) {
+				return parts[0] + "." + parts[1] + ".*.*";
+			}
+		}
+		if (ip.contains(":")) {
+			String[] parts = ip.split(":");
+			if (parts.length >= 2) {
+				return parts[0] + ":" + parts[1] + ":*:*";
+			}
+		}
+		return "***";
+	}
+
 	private UserProfileEntity ensureProfile(String userId) {
 		return userProfileRepository.findByUserCode(userId)
 				.orElseThrow(() -> new BusinessException("PROFILE_NOT_FOUND", "用户档案不存在，请先登录"));
@@ -1992,6 +2562,8 @@ public class HealthAssistantService {
 			String authMode,
 			String accountType,
 			String accountIdentifier,
+			LoginSecurityAssessment securityAssessment,
+			boolean accountVerified,
 			boolean privacyConsentCompleted
 	) {
 		Instant now = Instant.now();
@@ -2005,6 +2577,12 @@ public class HealthAssistantService {
 		sessionEntity.setAuthMode(authMode);
 		sessionEntity.setAccountType(accountType);
 		sessionEntity.setAccountIdentifier(accountIdentifier);
+		sessionEntity.setDeviceFingerprintHash(securityAssessment.deviceFingerprintHash());
+		sessionEntity.setDeviceLabel(securityAssessment.deviceLabel());
+		sessionEntity.setClientIpHash(securityAssessment.clientIpHash());
+		sessionEntity.setClientIpMasked(securityAssessment.clientIpMasked());
+		sessionEntity.setLoginRiskLevel(securityAssessment.riskLevel());
+		sessionEntity.setSecurityNoticesJson(jsonCodec.toJson(securityAssessment.securityNotices()));
 		sessionEntity.setPrivacyConsentCompleted(privacyConsentCompleted);
 		sessionEntity.setToken(token);
 		sessionEntity.setExpiresAt(expiresAt);
@@ -2021,6 +2599,11 @@ public class HealthAssistantService {
 				authMode,
 				accountType,
 				accountIdentifier,
+				session.deviceLabel(),
+				session.clientIpMasked(),
+				session.loginRiskLevel(),
+				session.securityNotices(),
+				accountVerified,
 				privacyConsentCompleted,
 				session.createdAt(),
 				session.lastSeenAt(),
@@ -2038,6 +2621,11 @@ public class HealthAssistantService {
 				sessionEntity.getAuthMode(),
 				sessionEntity.getAccountType(),
 				sessionEntity.getAccountIdentifier(),
+				sessionEntity.getDeviceLabel(),
+				sessionEntity.getClientIpMasked(),
+				defaultString(sessionEntity.getLoginRiskLevel(), "GREEN"),
+				decodeStringList(sessionEntity.getSecurityNoticesJson()),
+				resolveAccountVerified(sessionEntity.getUserCode(), sessionEntity.getAccountType(), sessionEntity.getAccountIdentifier()),
 				sessionEntity.isPrivacyConsentCompleted(),
 				sessionEntity.getCreatedAt(),
 				sessionEntity.getLastSeenAt(),
@@ -2060,6 +2648,9 @@ public class HealthAssistantService {
 				entity.getAuthMode(),
 				entity.getAccountType(),
 				entity.getAccountIdentifier(),
+				entity.getDeviceLabel(),
+				entity.getClientIpMasked(),
+				defaultString(entity.getLoginRiskLevel(), "GREEN"),
 				currentSession,
 				entity.getCreatedAt(),
 				entity.getLastSeenAt(),
@@ -2142,13 +2733,16 @@ public class HealthAssistantService {
 		String normalized = value.trim();
 		if ("EMAIL".equals(accountType)) {
 			normalized = normalized.toLowerCase(Locale.ROOT);
-			if (!normalized.contains("@") || normalized.startsWith("@") || normalized.endsWith("@")) {
+			if (!EMAIL_PATTERN.matcher(normalized).matches()) {
 				throw new BusinessException("EMAIL_INVALID", "请输入有效的邮箱账号");
 			}
 			return normalized;
 		}
-		String digits = normalized.replaceAll("[^0-9+]", "");
-		if (digits.length() < 11) {
+		String digits = normalized.replaceAll("[^0-9]", "");
+		if (digits.startsWith("86") && digits.length() == 13) {
+			digits = digits.substring(2);
+		}
+		if (!CHINA_MAINLAND_PHONE_PATTERN.matcher(digits).matches()) {
 			throw new BusinessException("PHONE_INVALID", "请输入有效的手机号");
 		}
 		return digits;
@@ -2216,12 +2810,18 @@ public class HealthAssistantService {
 	}
 
 	private AppContracts.LabReportAnalyzeResponse toLabReportResponse(LabReportRecordEntity record) {
+		List<AppContracts.LabIndicator> indicators = readIndicators(record.getIndicatorsJson());
+		boolean reviewReady = isLabReviewReady(indicators);
 		return new AppContracts.LabReportAnalyzeResponse(
 				record.getReportCode(),
 				record.getReportDate(),
-				readIndicators(record.getIndicatorsJson()),
+				indicators,
 				toRiskLevel(record.getOverallRiskLevel()),
+				!reviewReady,
+				reviewReady,
+				reviewReady ? "OCR_EXTRACTED" : "MANUAL_CONFIRMATION_REQUIRED",
 				readStringList(record.getSuggestionsJson()),
+				buildLabAnalyzeTrustNotes(indicators),
 				record.getSummaryText()
 		);
 	}
@@ -2401,6 +3001,23 @@ public class HealthAssistantService {
 		return notes;
 	}
 
+	private List<String> buildLabAnalyzeTrustNotes(List<AppContracts.LabIndicator> indicators) {
+		if (!isLabReviewReady(indicators)) {
+			return List.of(
+					"当前报告处于人工确认模式，系统不会用估算值替代真实化验结果。",
+					"在人工确认前，不会输出目标值判断、趋势对比或正式风险推演。"
+			);
+		}
+		return List.of(
+				"当前结果基于 OCR 提取到的指标生成，仍需结合原始化验单和医生意见确认。",
+				"如果关键指标缺失或图像不清晰，请重新上传后再复盘。"
+		);
+	}
+
+	private boolean isLabReviewReady(List<AppContracts.LabIndicator> indicators) {
+		return indicators != null && !indicators.isEmpty();
+	}
+
 	private Optional<AppContracts.LabIndicator> findUricAcidIndicator(List<AppContracts.LabIndicator> indicators) {
 		return indicators.stream()
 				.filter(item -> isUricAcidIndicator(item.code(), item.name()))
@@ -2448,6 +3065,21 @@ public class HealthAssistantService {
 
 	private String defaultString(String value) {
 		return value == null ? "" : value;
+	}
+
+	private String defaultString(String value, String fallback) {
+		return StringUtils.hasText(value) ? value : fallback;
+	}
+
+	private List<String> decodeStringList(String json) {
+		if (!StringUtils.hasText(json)) {
+			return List.of();
+		}
+		try {
+			return jsonCodec.fromJson(json, STRING_LIST_TYPE);
+		} catch (BusinessException ex) {
+			return List.of();
+		}
 	}
 
 	private List<AppContracts.MealItem> safeMealItems(List<AppContracts.MealItem> items) {

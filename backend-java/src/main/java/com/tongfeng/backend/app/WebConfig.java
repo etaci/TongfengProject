@@ -21,6 +21,8 @@ public class WebConfig implements WebMvcConfigurer {
 						"/api/v1/auth/mock-login",
 						"/api/v1/auth/register",
 						"/api/v1/auth/login",
+						"/api/v1/auth/verification-codes/request",
+						"/api/v1/auth/password-reset/confirm",
 						"/actuator/**"
 				);
 	}

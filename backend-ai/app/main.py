@@ -198,18 +198,18 @@ def build_lab_indicators(values: dict[str, float]) -> list[LabIndicator]:
     return indicators
 
 
-def fallback_lab_values(user_id: str, report_date: str, raw: bytes) -> dict[str, float]:
-    digest = hashlib.sha1((user_id + report_date).encode("utf-8") + raw).hexdigest()
-    seed = int(digest[:8], 16)
-    return {
-        "UA": float(320 + seed % 230),
-        "CR": float(68 + (seed // 3) % 48),
-        "CRP": float(1 + (seed // 7) % 18),
-        "ESR": float(5 + (seed // 11) % 28),
-    }
+def lab_suggestions(
+    indicators: list[LabIndicator],
+    ocr_result: OCRTextResult,
+    extracted_values: dict[str, float],
+) -> list[str]:
+    if not extracted_values:
+        return [
+            "本次化验单未能稳定提取出关键指标，当前结果不会进入正式复盘结论链路。",
+            "请重新上传更清晰的图片或 PDF，必要时改为人工确认关键指标后再继续复盘。",
+            "在人工确认前，系统不会输出目标值判断、趋势对比或风险推演。",
+        ]
 
-
-def lab_suggestions(indicators: list[LabIndicator], ocr_result: OCRTextResult) -> list[str]:
     suggestions: list[str] = []
     indicator_map = {item.code: item for item in indicators}
     ua = indicator_map.get("UA")
@@ -219,10 +219,7 @@ def lab_suggestions(indicators: list[LabIndicator], ocr_result: OCRTextResult) -
         suggestions.append("尿酸结果偏高，建议结合饮食与复查节奏持续观察。")
     if (crp and crp.value > 8) or (esr and esr.value > 20):
         suggestions.append("炎症指标偏高，如伴随红肿热痛或发热，请及时咨询医生。")
-    if ocr_result.used_fallback:
-        suggestions.append("本次图片未能稳定提取足够文字，系统已使用保底规则估算，建议上传更清晰的化验单。")
-    else:
-        suggestions.append(f"本次化验单已通过 {ocr_result.engine} 完成文字识别，并按规则抽取关键指标。")
+    suggestions.append(f"本次化验单已通过 {ocr_result.engine} 完成文字识别，并按规则抽取关键指标。")
     suggestions.append("解析结果仅作健康管理参考，正式判断请以医生意见为准。")
     return suggestions
 
@@ -261,21 +258,21 @@ async def lab_report_analyze(
     userId: str = Form(...),
     reportDate: str = Form(""),
 ) -> LabAnalyzeResult:
+    del userId, reportDate
     raw = await file.read()
     ocr_result = extract_text(raw, file.filename or "upload")
     extracted_values = extract_lab_values(ocr_result.text)
-    values = extracted_values if extracted_values else fallback_lab_values(userId, reportDate, raw)
-    indicators = build_lab_indicators(values)
+    indicators = build_lab_indicators(extracted_values) if extracted_values else []
     overall = max_risk([item.riskLevel for item in indicators])
-    summary_source = "真实 OCR 抽取" if extracted_values else "保底规则估算"
     summary = (
         f"已提取 {len(indicators)} 项关键指标，整体风险等级为 {overall}。"
-        f"本次结果来源：{summary_source}。"
+        if extracted_values
+        else "当前图片或文件未能稳定提取出关键指标，已转为人工确认模式，暂不输出正式化验结论。"
     )
     return LabAnalyzeResult(
         indicators=indicators,
         overallRiskLevel=overall,
-        suggestions=lab_suggestions(indicators, ocr_result),
+        suggestions=lab_suggestions(indicators, ocr_result, extracted_values),
         summary=summary,
     )
 

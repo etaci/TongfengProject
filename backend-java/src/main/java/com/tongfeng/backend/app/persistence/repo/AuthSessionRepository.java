@@ -15,5 +15,7 @@ public interface AuthSessionRepository extends JpaRepository<AuthSessionEntity, 
 
 	List<AuthSessionEntity> findByUserCodeOrderByLastSeenAtDescCreatedAtDesc(String userCode);
 
+	List<AuthSessionEntity> findByUserCodeAndCreatedAtAfterOrderByCreatedAtDesc(String userCode, java.time.Instant createdAt);
+
 	void deleteByToken(String token);
 }

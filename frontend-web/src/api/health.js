@@ -36,6 +36,30 @@ export function loginWithPassword(payload) {
   );
 }
 
+export function requestVerificationCode(payload) {
+  return apiRequest(
+    "/api/v1/auth/verification-codes/request",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      skipAuth: true,
+    },
+    null,
+  );
+}
+
+export function confirmPasswordReset(payload) {
+  return apiRequest(
+    "/api/v1/auth/password-reset/confirm",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      skipAuth: true,
+    },
+    null,
+  );
+}
+
 export function logoutSession(session) {
   return apiRequest(
     "/api/v1/auth/logout",
@@ -52,6 +76,31 @@ export function getCurrentSession(session) {
 
 export function getActiveSessions(session) {
   return apiRequest("/api/v1/auth/sessions", {}, session);
+}
+
+export function getAccountVerificationStatus(session) {
+  return apiRequest("/api/v1/auth/account-verification/status", {}, session);
+}
+
+export function requestAccountVerificationCode(session) {
+  return apiRequest(
+    "/api/v1/auth/account-verification/request",
+    {
+      method: "POST",
+    },
+    session,
+  );
+}
+
+export function confirmAccountVerification(session, payload) {
+  return apiRequest(
+    "/api/v1/auth/account-verification/confirm",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    session,
+  );
 }
 
 export function changePassword(session, payload) {
@@ -128,6 +177,7 @@ export async function getExtendedData(session, { familyEnabled = false } = {}) {
   const requestEntries = [
     ["authSession", () => getCurrentSession(session)],
     ["authActiveSessions", () => getActiveSessions(session)],
+    ["accountVerificationStatus", () => getAccountVerificationStatus(session)],
     ["privacyConsentCurrent", () => getCurrentPrivacyConsent(session)],
     ["privacyConsentHistory", () => getPrivacyConsentHistory(session)],
     ["proactiveSettings", () => apiRequest("/api/v1/proactive-care/settings", {}, session)],
@@ -180,6 +230,11 @@ export async function getExtendedData(session, { familyEnabled = false } = {}) {
       return accumulator;
     }
 
+    if (name === "accountVerificationStatus") {
+      accumulator[name] = null;
+      return accumulator;
+    }
+
     if (name === "recordCenter") {
       accumulator[name] = {
         types: [],
@@ -198,6 +253,7 @@ export async function getExtendedData(session, { familyEnabled = false } = {}) {
   }, {
     authSession: null,
     authActiveSessions: [],
+    accountVerificationStatus: null,
     privacyConsentCurrent: null,
     privacyConsentHistory: [],
     familyInvites: [],

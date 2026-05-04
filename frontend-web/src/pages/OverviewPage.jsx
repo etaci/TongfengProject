@@ -7,6 +7,22 @@ import TrendCard from "../components/TrendCard";
 import { SummaryList } from "../components/HealthBlocks";
 import { formatDate, formatDateTime } from "../utils/format";
 
+function getLabStatusSummary(labResult, review) {
+  if (!labResult) {
+    return "";
+  }
+
+  if (labResult.manualConfirmationRequired) {
+    return "这份化验单还在等待人工确认，当前不会直接进入目标值判断和趋势复盘。";
+  }
+
+  if (review && !review.reviewReady) {
+    return review.reviewSummary || "当前报告已经解析完成，但复盘链路还未完全就绪。";
+  }
+
+  return review?.targetConclusion || review?.reviewSummary || labResult.summary || "暂无化验单摘要。";
+}
+
 function CapabilityPanel({ capabilities }) {
   const features = capabilities?.features || [];
 
@@ -312,6 +328,8 @@ function LabReviewEntryPanel({ data }) {
   }
 
   const review = data.labReview;
+  const needsManualConfirmation = Boolean(data.labResult.manualConfirmationRequired || review?.manualConfirmationRequired);
+  const reviewReady = Boolean(review?.reviewReady);
 
   return (
     <Card>
@@ -325,28 +343,45 @@ function LabReviewEntryPanel({ data }) {
       <div className="result-header">
         <div>
           <strong>{formatDate(data.labResult.reportDate)}</strong>
-          <p>{review?.targetConclusion || review?.reviewSummary || data.labResult.summary || "暂无化验单摘要。"}</p>
+          <p>{getLabStatusSummary(data.labResult, review)}</p>
         </div>
         <RiskBadge level={review?.overallRiskLevel || data.labResult.overallRiskLevel} />
       </div>
-      <div className="stats-grid stats-grid--compact">
-        <div className="stat-line">
-          <span>本次尿酸</span>
-          <strong>
-            {review?.currentUricAcidValue != null
-              ? `${review.currentUricAcidValue} ${review.currentUricAcidUnit || ""}`
-              : "未识别"}
-          </strong>
+      {needsManualConfirmation ? (
+        <div className="stats-grid stats-grid--compact">
+          <div className="stat-line">
+            <span>提取状态</span>
+            <strong>{data.labResult.extractionStatus || "待人工确认"}</strong>
+          </div>
+          <div className="stat-line">
+            <span>复盘状态</span>
+            <strong>{review?.reviewStatus || "MANUAL_CONFIRMATION_REQUIRED"}</strong>
+          </div>
+          <div className="stat-line">
+            <span>当前建议</span>
+            <strong>补传清晰报告</strong>
+          </div>
         </div>
-        <div className="stat-line">
-          <span>目标尿酸</span>
-          <strong>{review?.targetUricAcidValue != null ? `${review.targetUricAcidValue} ${review.currentUricAcidUnit || ""}` : "未设置"}</strong>
+      ) : (
+        <div className="stats-grid stats-grid--compact">
+          <div className="stat-line">
+            <span>本次尿酸</span>
+            <strong>
+              {review?.currentUricAcidValue != null
+                ? `${review.currentUricAcidValue} ${review.currentUricAcidUnit || ""}`
+                : "未识别"}
+            </strong>
+          </div>
+          <div className="stat-line">
+            <span>目标尿酸</span>
+            <strong>{review?.targetUricAcidValue != null ? `${review.targetUricAcidValue} ${review.currentUricAcidUnit || ""}` : "未设置"}</strong>
+          </div>
+          <div className="stat-line">
+            <span>{reviewReady ? "与上次间隔" : "复盘状态"}</span>
+            <strong>{reviewReady ? (review?.daysBetweenReports != null ? `${review.daysBetweenReports} 天` : "暂无基线") : (review?.reviewStatus || "待复盘")}</strong>
+          </div>
         </div>
-        <div className="stat-line">
-          <span>与上次间隔</span>
-          <strong>{review?.daysBetweenReports != null ? `${review.daysBetweenReports} 天` : "暂无基线"}</strong>
-        </div>
-      </div>
+      )}
       <p className="narrative-text">
         {review?.followUpRecommendation || data.labResult.suggestions?.[0] || "进入问答与档案页后，可继续查看完整复盘和下一步建议。"}
       </p>

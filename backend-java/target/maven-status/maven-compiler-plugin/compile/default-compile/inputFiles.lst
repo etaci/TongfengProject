@@ -4,6 +4,7 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AppContra
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AppProperties.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AuthController.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AuthInterceptor.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AuthRequestContext.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\BusinessException.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\CoreController.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\FamilyCareService.java
@@ -19,6 +20,7 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\MvpMetric
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\PasswordHashService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthIdentityEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthSessionEntity.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthVerificationChallengeEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\DailyHealthSummaryEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\FamilyBindingEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\FamilyInviteEntity.java
@@ -42,6 +44,7 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persisten
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\WeightRecordEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AuthIdentityRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AuthSessionRepository.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AuthVerificationChallengeRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\DailyHealthSummaryRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\FamilyBindingRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\FamilyInviteRepository.java
@@ -68,6 +71,7 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\RecordCen
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\SessionCacheService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\UricAcidAnalysisService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\UserSession.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\VerificationDeliveryService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\WeatherGatewayService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\WebConfig.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\BackendJavaApplication.java

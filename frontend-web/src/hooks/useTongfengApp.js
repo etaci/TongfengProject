@@ -9,9 +9,12 @@ import {
   changePassword as changePasswordRequest,
   cancelFamilyInvite,
   claimGrowthReward,
+  confirmAccountVerification as confirmAccountVerificationRequest,
+  confirmPasswordReset as confirmPasswordResetRequest,
   getCurrentPrivacyConsent,
   getCurrentSession,
   getActiveSessions,
+  getAccountVerificationStatus,
   createFamilyInvite,
   createFamilyTask,
   loginWithPassword,
@@ -35,6 +38,8 @@ import {
   completeFamilyTask,
   removeFamilyBinding,
   registerAccount,
+  requestAccountVerificationCode as requestAccountVerificationCodeRequest,
+  requestVerificationCode as requestVerificationCodeRequest,
   restoreRecord,
   syncDeviceData,
   submitRecord,
@@ -70,6 +75,7 @@ const initialData = {
   mvpMetricsSummary: null,
   authSession: null,
   authActiveSessions: [],
+  accountVerificationStatus: null,
   profile: null,
   privacyConsentCurrent: null,
   privacyConsentHistory: [],
@@ -131,6 +137,11 @@ export default function useTongfengApp() {
     setBusyMap((current) => ({ ...current, [key]: value }));
   }, []);
 
+  const withSecurityNotice = useCallback((baseMessage, payload) => {
+    const notices = payload?.securityNotices || [];
+    return notices.length ? `${baseMessage} 安全提示：${notices.join("；")}` : baseMessage;
+  }, []);
+
   const isFamilyEnabled = useCallback((capabilitiesPayload) => {
     const features = capabilitiesPayload?.features || [];
     return features.some((item) => item.featureKey === "family-care" && item.enabled);
@@ -141,6 +152,7 @@ export default function useTongfengApp() {
       ...current,
       authSession: extended.authSession,
       authActiveSessions: extended.authActiveSessions || [],
+      accountVerificationStatus: extended.accountVerificationStatus,
       privacyConsentCurrent: extended.privacyConsentCurrent,
       privacyConsentHistory: extended.privacyConsentHistory || [],
       proactiveSettings: extended.proactiveSettings,
@@ -242,6 +254,7 @@ export default function useTongfengApp() {
         mvpMetricsSummary: responses[13].data,
         authSession: extended.authSession,
         authActiveSessions: extended.authActiveSessions || [],
+        accountVerificationStatus: extended.accountVerificationStatus,
         privacyConsentCurrent: extended.privacyConsentCurrent,
         privacyConsentHistory: extended.privacyConsentHistory || [],
         proactiveSettings: extended.proactiveSettings,
@@ -360,6 +373,30 @@ export default function useTongfengApp() {
     }
   }, [setBusy]);
 
+  const requestVerificationCode = useCallback(async (payload) => {
+    setBusy("requestVerificationCode", true);
+    try {
+      const response = await requestVerificationCodeRequest(payload);
+      const target = response.data.maskedTarget ? `，目标账号 ${response.data.maskedTarget}` : "";
+      const simulatedCode = response.data.simulatedCode ? ` 当前模拟验证码：${response.data.simulatedCode}` : "";
+      setBanner({ tone: "success", message: `${response.data.message}${target}。${simulatedCode}` });
+      return response.data;
+    } finally {
+      setBusy("requestVerificationCode", false);
+    }
+  }, [setBusy]);
+
+  const confirmPasswordReset = useCallback(async (payload) => {
+    setBusy("confirmPasswordReset", true);
+    try {
+      const response = await confirmPasswordResetRequest(payload);
+      setBanner({ tone: "success", message: response.data.message || "密码已重置，请使用新密码登录。" });
+      return response.data;
+    } finally {
+      setBusy("confirmPasswordReset", false);
+    }
+  }, [setBusy]);
+
   const logout = useCallback(async () => {
     if (session?.token) {
       try {
@@ -445,6 +482,49 @@ export default function useTongfengApp() {
         setBanner({ tone: "success", message: response.data.message || "会话已移除。" });
       } finally {
         setBusy(`revoke-session-${sessionCode}`, false);
+      }
+    },
+    [session, setBusy],
+  );
+
+  const requestAccountVerificationCode = useCallback(
+    async () => {
+      setBusy("accountVerificationRequest", true);
+      try {
+        const response = await requestAccountVerificationCodeRequest(session);
+        const simulatedCode = response.data.simulatedCode ? ` 当前模拟验证码：${response.data.simulatedCode}` : "";
+        setBanner({ tone: "success", message: `${response.data.message}。${simulatedCode}` });
+        return response.data;
+      } finally {
+        setBusy("accountVerificationRequest", false);
+      }
+    },
+    [session, setBusy],
+  );
+
+  const confirmAccountVerification = useCallback(
+    async (payload) => {
+      setBusy("accountVerificationConfirm", true);
+      try {
+        const response = await confirmAccountVerificationRequest(session, payload);
+        const [sessionResponse, verificationStatusResponse] = await Promise.all([
+          getCurrentSession(session).catch(() => null),
+          getAccountVerificationStatus(session).catch(() => null),
+        ]);
+        const nextSession = sessionResponse?.data?.token ? { ...session, ...sessionResponse.data } : session;
+        if (nextSession?.token) {
+          writeSession(nextSession);
+          setSession(nextSession);
+        }
+        setData((current) => ({
+          ...current,
+          authSession: sessionResponse?.data || current.authSession,
+          accountVerificationStatus: verificationStatusResponse?.data || response.data,
+        }));
+        setBanner({ tone: "success", message: response.data.message || "账号验证已完成。" });
+        return response.data;
+      } finally {
+        setBusy("accountVerificationConfirm", false);
       }
     },
     [session, setBusy],
@@ -957,12 +1037,16 @@ export default function useTongfengApp() {
     register,
     login,
     loginDemo,
+    requestVerificationCode,
+    confirmPasswordReset,
     logout,
     hydrate,
     refreshDashboard,
     submitProfile,
     submitPrivacyConsent,
     submitPasswordChange,
+    requestAccountVerificationCode,
+    confirmAccountVerification,
     submitMedication,
     submitMedicationCheckin,
     submitSimpleRecord,

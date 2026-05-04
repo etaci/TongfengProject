@@ -45,6 +45,18 @@ public class AuthIdentityEntity {
 	@Column
 	private Instant lastLoginAt;
 
+	@Column
+	private Instant verifiedAt;
+
+	@Column(nullable = false)
+	private int failedLoginCount;
+
+	@Column
+	private Instant lastFailedLoginAt;
+
+	@Column
+	private Instant lockedUntil;
+
 	@Column(nullable = false)
 	private Instant createdAt;
 
@@ -121,6 +133,38 @@ public class AuthIdentityEntity {
 
 	public Instant getCreatedAt() {
 		return createdAt;
+	}
+
+	public Instant getVerifiedAt() {
+		return verifiedAt;
+	}
+
+	public void setVerifiedAt(Instant verifiedAt) {
+		this.verifiedAt = verifiedAt;
+	}
+
+	public int getFailedLoginCount() {
+		return failedLoginCount;
+	}
+
+	public void setFailedLoginCount(int failedLoginCount) {
+		this.failedLoginCount = failedLoginCount;
+	}
+
+	public Instant getLastFailedLoginAt() {
+		return lastFailedLoginAt;
+	}
+
+	public void setLastFailedLoginAt(Instant lastFailedLoginAt) {
+		this.lastFailedLoginAt = lastFailedLoginAt;
+	}
+
+	public Instant getLockedUntil() {
+		return lockedUntil;
+	}
+
+	public void setLockedUntil(Instant lockedUntil) {
+		this.lockedUntil = lockedUntil;
 	}
 
 	public void setCreatedAt(Instant createdAt) {

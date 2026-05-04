@@ -1,0 +1,76 @@
+@baseUrl = http://localhost:8080
+
+### 1. 正式注册，模拟一个已知设备
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+User-Agent: TongfengManualBrowser/1.0
+X-Device-Fingerprint: manual-device-a
+X-Device-Label: Web / Chrome / Windows
+X-Forwarded-For: 10.10.1.8
+
+{
+  "nickname": "v23-risk-user",
+  "accountType": "EMAIL",
+  "account": "v23-risk-user@example.com",
+  "password": "Password123",
+  "confirmPassword": "Password123",
+  "consent": {
+    "consentVersion": "v1.0",
+    "privacyPolicyVersion": "privacy-v1.0",
+    "privacyAccepted": true,
+    "termsAccepted": true,
+    "medicalDataAuthorized": true,
+    "familyCollaborationAuthorized": true,
+    "notificationAuthorized": true
+  }
+}
+
+### 2. 请求找回密码验证码，观察 deliveryProvider / deliveryStatus
+POST {{baseUrl}}/api/v1/auth/verification-codes/request
+Content-Type: application/json
+
+{
+  "purpose": "PASSWORD_RESET",
+  "accountType": "EMAIL",
+  "account": "v23-risk-user@example.com"
+}
+
+> {%
+client.global.set("reset_code", response.body.data.simulatedCode);
+%}
+
+### 3. 立即再次请求，预期命中 cooldown
+POST {{baseUrl}}/api/v1/auth/verification-codes/request
+Content-Type: application/json
+
+{
+  "purpose": "PASSWORD_RESET",
+  "accountType": "EMAIL",
+  "account": "v23-risk-user@example.com"
+}
+
+### 4. 使用新设备、新网络登录，预期 loginRiskLevel=RED
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+User-Agent: TongfengManualBrowser/2.0
+X-Device-Fingerprint: manual-device-b
+X-Device-Label: Web / Firefox / Linux
+X-Forwarded-For: 172.20.8.15
+
+{
+  "accountType": "EMAIL",
+  "account": "v23-risk-user@example.com",
+  "password": "Password123"
+}
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 5. 查看当前会话，确认设备标签和风险等级
+GET {{baseUrl}}/api/v1/auth/session
+Authorization: Bearer {{token}}
+
+### 6. 查看提醒列表，预期出现 ACCOUNT_SECURITY
+GET {{baseUrl}}/api/v1/reminders
+Authorization: Bearer {{token}}
