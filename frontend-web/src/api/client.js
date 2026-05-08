@@ -143,7 +143,12 @@ export async function apiRequest(path, options = {}, session = null) {
   const payload = contentType.includes("application/json") ? await response.json() : null;
 
   if (!response.ok || payload?.success === false) {
-    throw new Error(payload?.message || `请求失败：${response.status}`);
+    const error = new Error(payload?.message || `请求失败：${response.status}`);
+    error.code = payload?.code || "";
+    error.status = response.status;
+    error.payload = payload;
+    error.data = payload?.data ?? null;
+    throw error;
   }
 
   return payload;

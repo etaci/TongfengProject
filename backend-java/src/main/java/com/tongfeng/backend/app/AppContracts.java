@@ -682,6 +682,52 @@ public final class AppContracts {
 	) {
 	}
 
+	public record LabReportTrustTimelineItemResponse(
+			String eventKey,
+			String title,
+			String detail,
+			String status,
+			Instant occurredAt
+	) {
+	}
+
+	public record LabIndicatorTrustItemResponse(
+			String code,
+			String name,
+			String sourceType,
+			String verificationStatus,
+			Integer confidenceScore,
+			String confidenceLabel,
+			String note
+	) {
+	}
+
+	public record LabReportTrustMetaResponse(
+			String documentSourceType,
+			String documentSourceLabel,
+			boolean originalFileAttached,
+			String originalFileName,
+			Instant uploadedAt,
+			String institutionSourceLabel,
+			boolean institutionVerified,
+			String verificationStage,
+			List<String> lockedSections,
+			Instant manualConfirmedAt,
+			List<LabReportTrustTimelineItemResponse> confirmationHistory,
+			List<LabIndicatorTrustItemResponse> fieldConfidenceItems
+	) {
+	}
+
+	public record LabDoctorSummaryResponse(
+			boolean readyToShare,
+			String shareTitle,
+			String shareSummary,
+			List<String> keyFindings,
+			List<String> careRequests,
+			List<String> trustNotes
+	) {
+	}
+
 	public record LabReportReviewResponse(
 			String reportId,
 			LocalDate reportDate,
@@ -690,6 +736,7 @@ public final class AppContracts {
 			boolean reviewReady,
 			String reviewStatus,
 			String reviewSummary,
+			String workflowTitle,
 			String comparedReportId,
 			LocalDate comparedReportDate,
 			Integer daysBetweenReports,
@@ -701,9 +748,36 @@ public final class AppContracts {
 			List<LabReportReviewComparisonResponse> comparisons,
 			List<String> keyChanges,
 			String followUpRecommendation,
+			List<TodayActionItemResponse> manualConfirmationTasks,
+			List<String> blockedOutputs,
 			List<String> nextActions,
 			List<String> trustNotes,
+			LabReportTrustMetaResponse trustMeta,
+			LabDoctorSummaryResponse doctorSummary,
 			Instant generatedAt
+	) {
+	}
+
+	public record LabManualIndicatorRequest(
+			@NotBlank(message = "指标编码不能为空")
+			String code,
+			@NotBlank(message = "指标名称不能为空")
+			String name,
+			@NotNull(message = "指标数值不能为空")
+			@Positive(message = "指标数值必须大于0")
+			BigDecimal value,
+			@NotBlank(message = "指标单位不能为空")
+			String unit,
+			String referenceRange,
+			@NotNull(message = "请确认指标风险等级")
+			RiskLevel riskLevel
+	) {
+	}
+
+	public record LabReportManualConfirmRequest(
+			@NotEmpty(message = "请至少补录一个关键指标")
+			List<@Valid LabManualIndicatorRequest> indicators,
+			String summaryNote
 	) {
 	}
 

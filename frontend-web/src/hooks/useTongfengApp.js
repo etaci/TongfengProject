@@ -9,6 +9,7 @@ import {
   changePassword as changePasswordRequest,
   cancelFamilyInvite,
   claimGrowthReward,
+  confirmLabReportManualEntry,
   confirmAccountVerification as confirmAccountVerificationRequest,
   confirmPasswordReset as confirmPasswordResetRequest,
   getCurrentPrivacyConsent,
@@ -122,6 +123,23 @@ const initialData = {
   },
 };
 
+function pickFocusedLabReport(labs, preferredReportId = null) {
+  const items = labs || [];
+
+  if (!items.length) {
+    return null;
+  }
+
+  if (preferredReportId) {
+    const preferred = items.find((item) => item.reportId === preferredReportId);
+    if (preferred) {
+      return preferred;
+    }
+  }
+
+  return items.find((item) => item.manualConfirmationRequired) || items[0];
+}
+
 export default function useTongfengApp() {
   const [session, setSession] = useState(() => readSession());
   const [trendDays, setTrendDays] = useState("7");
@@ -191,27 +209,30 @@ export default function useTongfengApp() {
   const applyBootstrapPayload = useCallback((responses) => {
     const capabilities = responses[0].data || { features: [] };
     const labs = responses[9].data || [];
-    setData((current) => ({
-      ...current,
-      capabilities,
-      profile: responses[1].data,
-      overview: responses[2].data,
-      todayPlan: responses[3].data,
-      trends: responses[4].data,
-      summaries: responses[5].data || [],
-      reminders: responses[6].data || [],
-      meals: responses[7].data || [],
-      timeline: responses[8].data?.events || [],
-      labs,
-      labResult: labs[0] || null,
-      labReview: current.labReview,
-      persona: responses[10].data,
-      uricAcidCauseAnalysis: responses[11].data,
-      medication: responses[12].data,
-      medicationAdherence: responses[13].data,
-      medicationWeeklyReport: responses[14].data,
-      mvpMetricsSummary: responses[15].data,
-    }));
+    setData((current) => {
+      const focusedLabReport = pickFocusedLabReport(labs, current.labResult?.reportId);
+      return {
+        ...current,
+        capabilities,
+        profile: responses[1].data,
+        overview: responses[2].data,
+        todayPlan: responses[3].data,
+        trends: responses[4].data,
+        summaries: responses[5].data || [],
+        reminders: responses[6].data || [],
+        meals: responses[7].data || [],
+        timeline: responses[8].data?.events || [],
+        labs,
+        labResult: focusedLabReport,
+        labReview: current.labReview,
+        persona: responses[10].data,
+        uricAcidCauseAnalysis: responses[11].data,
+        medication: responses[12].data,
+        medicationAdherence: responses[13].data,
+        medicationWeeklyReport: responses[14].data,
+        mvpMetricsSummary: responses[15].data,
+      };
+    });
   }, []);
 
   const refreshDashboard = useCallback(
@@ -227,12 +248,13 @@ export default function useTongfengApp() {
       const responses = await getDashboardBundle(nextSession, nextDays);
       const capabilities = responses[0].data || { features: [] };
       const labs = responses[8].data || [];
+      const focusedLabReport = pickFocusedLabReport(labs);
       const [extended, snapshots] = await Promise.all([
         getExtendedData(nextSession, { familyEnabled: isFamilyEnabled(capabilities) }),
         getRecordSnapshots(nextSession),
       ]);
-      const labReviewResponse = labs.length
-        ? await getLabReportReview(nextSession, labs[0].reportId).catch(() => null)
+      const labReviewResponse = focusedLabReport
+        ? await getLabReportReview(nextSession, focusedLabReport.reportId).catch(() => null)
         : null;
       setData((current) => ({
         ...current,
@@ -245,7 +267,7 @@ export default function useTongfengApp() {
         meals: responses[6].data || [],
         timeline: responses[7].data?.events || [],
         labs,
-        labResult: labs[0] || null,
+        labResult: focusedLabReport,
         labReview: labReviewResponse?.data || null,
         persona: responses[9].data,
         uricAcidCauseAnalysis: responses[10].data,
@@ -302,6 +324,7 @@ export default function useTongfengApp() {
         const responses = await getBootstrapData(nextSession, nextDays);
         const capabilities = responses[0].data || { features: [] };
         const labs = responses[9].data || [];
+        const focusedLabReport = pickFocusedLabReport(labs);
         const [extended, snapshots] = await Promise.all([
           getExtendedData(nextSession, { familyEnabled: isFamilyEnabled(capabilities) }),
           getRecordSnapshots(nextSession),
@@ -309,11 +332,11 @@ export default function useTongfengApp() {
         applyBootstrapPayload(responses);
         applyExtendedPayload(extended);
         applyRecordSnapshots(snapshots);
-        if (labs.length) {
-          const labReviewResponse = await getLabReportReview(nextSession, labs[0].reportId).catch(() => null);
-          setData((current) => ({ ...current, labReview: labReviewResponse?.data || null }));
+        if (focusedLabReport) {
+          const labReviewResponse = await getLabReportReview(nextSession, focusedLabReport.reportId).catch(() => null);
+          setData((current) => ({ ...current, labResult: focusedLabReport, labReview: labReviewResponse?.data || null }));
         } else {
-          setData((current) => ({ ...current, labReview: null }));
+          setData((current) => ({ ...current, labResult: null, labReview: null }));
         }
 
         if (!silent) {
@@ -628,9 +651,15 @@ export default function useTongfengApp() {
       try {
         const response = await analyzeLab(session, formData);
         const reviewResponse = await getLabReportReview(session, response.data.reportId).catch(() => null);
-        setData((current) => ({ ...current, labResult: response.data, labReview: reviewResponse?.data || null }));
+        const reviewData = reviewResponse?.data || null;
+        const manualConfirmationRequired = Boolean(reviewData?.manualConfirmationRequired || response.data.manualConfirmationRequired);
+        setData((current) => ({ ...current, labResult: response.data, labReview: reviewData }));
         await refreshDashboard(session, trendDays, true);
-        setBanner({ tone: "success", message: "化验单解析已完成。" });
+        setBanner(
+          manualConfirmationRequired
+            ? { tone: "neutral", message: "化验单已进入人工确认模式，请先补录关键指标后再生成正式复盘。" }
+            : { tone: "success", message: "化验单解析已完成。" },
+        );
       } finally {
         setBusy("lab", false);
       }
@@ -643,18 +672,44 @@ export default function useTongfengApp() {
       setBusy("labReview", true);
       try {
         const response = await getLabReportReview(session, reportId);
+        const manualConfirmationRequired = Boolean(response.data?.manualConfirmationRequired);
         setData((current) => ({
           ...current,
           labResult: current.labs.find((item) => item.reportId === reportId) || current.labResult,
           labReview: response.data,
         }));
-        setBanner({ tone: "success", message: "化验单复盘已加载。" });
+        setBanner(
+          manualConfirmationRequired
+            ? { tone: "neutral", message: "这份化验单仍待人工确认，请先完成关键指标补录。" }
+            : { tone: "success", message: "化验单复盘已加载。" },
+        );
         return response.data;
       } finally {
         setBusy("labReview", false);
       }
     },
     [session, setBusy],
+  );
+
+  const submitLabManualConfirmation = useCallback(
+    async (reportId, payload) => {
+      setBusy("labManualConfirm", true);
+      try {
+        const response = await confirmLabReportManualEntry(session, reportId, payload);
+        await refreshDashboard(session, trendDays, true);
+        const reviewResponse = await getLabReportReview(session, reportId).catch(() => null);
+        setData((current) => ({
+          ...current,
+          labResult: current.labs.find((item) => item.reportId === reportId) || current.labResult,
+          labReview: reviewResponse?.data || response.data,
+        }));
+        setBanner({ tone: "success", message: "人工补录已完成，这份化验单已进入正式复盘。" });
+        return reviewResponse?.data || response.data;
+      } finally {
+        setBusy("labManualConfirm", false);
+      }
+    },
+    [refreshDashboard, session, setBusy, trendDays],
   );
 
   const submitKnowledgeQuestion = useCallback(
@@ -1052,6 +1107,7 @@ export default function useTongfengApp() {
     submitSimpleRecord,
     submitMealAnalysis,
     submitLabAnalysis,
+    submitLabManualConfirmation,
     loadLabReportReview,
     submitKnowledgeQuestion,
     submitProactiveSettings,

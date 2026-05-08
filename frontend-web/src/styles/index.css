@@ -572,6 +572,23 @@ textarea:focus {
   margin-bottom: 18px;
 }
 
+.lab-manual-guide {
+  margin-top: 16px;
+}
+
+.lab-trust-panel,
+.lab-doctor-summary {
+  margin-top: 18px;
+}
+
+.trust-timeline-card {
+  padding: 16px 18px;
+}
+
+.lab-task-card strong {
+  font-size: 16px;
+}
+
 .split-block > div {
   flex: 1;
   padding: 20px;

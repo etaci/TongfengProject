@@ -378,6 +378,17 @@ export function getLabReportReview(session, reportId) {
   return apiRequest(`/api/v1/lab-reports/${reportId}/review`, {}, session);
 }
 
+export function confirmLabReportManualEntry(session, reportId, payload) {
+  return apiRequest(
+    `/api/v1/lab-reports/${reportId}/manual-confirmation`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    session,
+  );
+}
+
 export function askKnowledge(session, payload) {
   return apiRequest(
     "/api/v1/knowledge/ask",

@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
@@ -43,6 +44,12 @@ public class LabReportRecordEntity {
 	@Lob
 	@Column(nullable = false, columnDefinition = "TEXT")
 	private String suggestionsJson;
+
+	@Column(nullable = false)
+	private boolean manualConfirmed;
+
+	@Column
+	private Instant manualConfirmedAt;
 
 	@Column(nullable = false, length = 500)
 	private String summaryText;
@@ -105,6 +112,22 @@ public class LabReportRecordEntity {
 
 	public void setSuggestionsJson(String suggestionsJson) {
 		this.suggestionsJson = suggestionsJson;
+	}
+
+	public boolean isManualConfirmed() {
+		return manualConfirmed;
+	}
+
+	public void setManualConfirmed(boolean manualConfirmed) {
+		this.manualConfirmed = manualConfirmed;
+	}
+
+	public Instant getManualConfirmedAt() {
+		return manualConfirmedAt;
+	}
+
+	public void setManualConfirmedAt(Instant manualConfirmedAt) {
+		this.manualConfirmedAt = manualConfirmedAt;
 	}
 
 	public String getSummaryText() {

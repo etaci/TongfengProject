@@ -23,6 +23,19 @@ function getLabStatusSummary(labResult, review) {
   return review?.targetConclusion || review?.reviewSummary || labResult.summary || "暂无化验单摘要。";
 }
 
+function getLabTrustStageLabel(stage) {
+  switch (stage) {
+    case "MANUAL_CONFIRMATION_REQUIRED":
+      return "待人工确认";
+    case "MANUAL_CONFIRMED":
+      return "已人工确认";
+    case "OCR_EXTRACTED":
+      return "已 OCR 提取";
+    default:
+      return stage || "待核验";
+  }
+}
+
 function CapabilityPanel({ capabilities }) {
   const features = capabilities?.features || [];
 
@@ -330,6 +343,9 @@ function LabReviewEntryPanel({ data }) {
   const review = data.labReview;
   const needsManualConfirmation = Boolean(data.labResult.manualConfirmationRequired || review?.manualConfirmationRequired);
   const reviewReady = Boolean(review?.reviewReady);
+  const trustStage = review?.trustMeta?.verificationStage || data.labResult.extractionStatus;
+  const trustStageLabel = getLabTrustStageLabel(trustStage);
+  const readyToShare = Boolean(review?.doctorSummary?.readyToShare);
 
   return (
     <Card>
@@ -385,6 +401,22 @@ function LabReviewEntryPanel({ data }) {
       <p className="narrative-text">
         {review?.followUpRecommendation || data.labResult.suggestions?.[0] || "进入问答与档案页后，可继续查看完整复盘和下一步建议。"}
       </p>
+      <div className="action-row">
+        <span className={`inline-tag ${needsManualConfirmation ? "risk-yellow" : "risk-green"}`}>
+          {trustStageLabel}
+        </span>
+        {review?.doctorSummary ? (
+          <span className={`inline-tag ${readyToShare ? "risk-green" : "risk-yellow"}`}>
+            {readyToShare ? "医生摘要可分享" : "医生摘要待核验"}
+          </span>
+        ) : null}
+      </div>
+      {needsManualConfirmation ? (
+        <div className="action-row">
+          <span className="inline-tag risk-yellow">待人工确认</span>
+          <span className="inline-tag">优先补录关键指标</span>
+        </div>
+      ) : null}
       <div className="action-row">
         {(review?.nextActions || review?.keyChanges || []).slice(0, 3).map((item) => (
           <span className="token token--tiny" key={item}>{item}</span>

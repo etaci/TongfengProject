@@ -319,6 +319,15 @@ public class CoreController {
 		return ApiResponse.success(healthAssistantService.getLabReportReview(userId, reportId));
 	}
 
+	@PutMapping("/api/v1/lab-reports/{reportId}/manual-confirmation")
+	public ApiResponse<AppContracts.LabReportReviewResponse> confirmLabReportManually(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@PathVariable String reportId,
+			@Valid @RequestBody AppContracts.LabReportManualConfirmRequest request
+	) {
+		return ApiResponse.success(healthAssistantService.confirmLabReportManually(userId, reportId, request));
+	}
+
 	@PostMapping("/api/v1/knowledge/ask")
 	public ApiResponse<AppContracts.KnowledgeAnswerResponse> askKnowledge(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,

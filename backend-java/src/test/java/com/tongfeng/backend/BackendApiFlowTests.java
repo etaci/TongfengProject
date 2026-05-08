@@ -1078,6 +1078,8 @@ class BackendApiFlowTests {
 				.andExpect(jsonPath("$.data.targetUricAcidValue").value(360))
 				.andExpect(jsonPath("$.data.currentUricAcidValue").value(430))
 				.andExpect(jsonPath("$.data.uricAcidWithinTarget").value(false))
+				.andExpect(jsonPath("$.data.trustMeta.fieldConfidenceItems[0].sourceType").value("OCR_EXTRACTED"))
+				.andExpect(jsonPath("$.data.trustMeta.fieldConfidenceItems[0].confidenceScore").isNumber())
 				.andExpect(jsonPath("$.data.comparisons").isArray())
 				.andReturn();
 
@@ -1142,8 +1144,55 @@ class BackendApiFlowTests {
 				.andExpect(jsonPath("$.data.manualConfirmationRequired").value(true))
 				.andExpect(jsonPath("$.data.reviewReady").value(false))
 				.andExpect(jsonPath("$.data.reviewStatus").value("MANUAL_CONFIRMATION_REQUIRED"))
+				.andExpect(jsonPath("$.data.workflowTitle").value("LAB_MANUAL_CONFIRMATION_PENDING"))
+				.andExpect(jsonPath("$.data.manualConfirmationTasks[0].actionKey").value("lab-confirm-clarity"))
+				.andExpect(jsonPath("$.data.manualConfirmationTasks[0].status").value("DO_NOW"))
+				.andExpect(jsonPath("$.data.blockedOutputs[0]").value("个人目标值是否达标"))
+				.andExpect(jsonPath("$.data.trustMeta.verificationStage").value("MANUAL_CONFIRMATION_REQUIRED"))
+				.andExpect(jsonPath("$.data.trustMeta.lockedSections[0]").value("个人目标值是否达标"))
+				.andExpect(jsonPath("$.data.trustMeta.fieldConfidenceItems").isEmpty())
+				.andExpect(jsonPath("$.data.doctorSummary.readyToShare").value(false))
 				.andExpect(jsonPath("$.data.comparisons").isEmpty())
 				.andExpect(jsonPath("$.data.nextActions[0]").value("重新上传更清晰的化验单图片或 PDF，优先确保指标名称、数值和单位完整可见。"));
+		mockMvc.perform(put("/api/v1/lab-reports/{reportId}/manual-confirmation", currentReport.getReportCode())
+						.header("Authorization", "Bearer " + token)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "indicators": [
+								    {
+								      "code": "UA",
+								      "name": "尿酸",
+								      "value": 428,
+								      "unit": "umol/L",
+								      "referenceRange": "208-428",
+								      "riskLevel": "YELLOW"
+								    }
+								  ],
+								  "summaryNote": "根据原始化验单人工补录关键指标"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.manualConfirmationRequired").value(false))
+				.andExpect(jsonPath("$.data.reviewReady").value(true))
+				.andExpect(jsonPath("$.data.reviewStatus").value("READY"))
+				.andExpect(jsonPath("$.data.workflowTitle").value("LAB_REVIEW_READY"))
+				.andExpect(jsonPath("$.data.currentUricAcidValue").value(428))
+				.andExpect(jsonPath("$.data.currentUricAcidUnit").value("umol/L"))
+				.andExpect(jsonPath("$.data.manualConfirmationTasks").isEmpty())
+				.andExpect(jsonPath("$.data.blockedOutputs").isEmpty())
+				.andExpect(jsonPath("$.data.trustMeta.verificationStage").value("MANUAL_CONFIRMED"))
+				.andExpect(jsonPath("$.data.trustMeta.manualConfirmedAt").isNotEmpty())
+				.andExpect(jsonPath("$.data.trustMeta.fieldConfidenceItems[0].sourceType").value("MANUAL_CONFIRMATION"))
+				.andExpect(jsonPath("$.data.trustMeta.fieldConfidenceItems[0].confidenceScore").value(100))
+				.andExpect(jsonPath("$.data.doctorSummary.readyToShare").value(true));
+
+		mockMvc.perform(get("/api/v1/lab-reports")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].manualConfirmationRequired").value(false))
+				.andExpect(jsonPath("$.data[0].reviewReady").value(true))
+				.andExpect(jsonPath("$.data[0].extractionStatus").value("MANUAL_CONFIRMED"));
 	}
 
 	@Test

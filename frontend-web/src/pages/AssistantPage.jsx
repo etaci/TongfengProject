@@ -34,8 +34,11 @@ function getAuthModeLabel(mode) {
 
 function getLabExtractionStatusLabel(status) {
   switch (status) {
+    case "MANUAL_CONFIRMED":
+      return "已人工补录";
     case "MANUAL_CONFIRMATION_REQUIRED":
       return "待人工确认";
+    case "OCR_EXTRACTED":
     case "EXTRACTED":
       return "已提取";
     case "PROCESSING":
@@ -60,6 +63,117 @@ function getLabReviewStatusLabel(status, reviewReady) {
     default:
       return status || "待复盘";
   }
+}
+
+function getLabWorkflowTitleLabel(title) {
+  switch (title) {
+    case "LAB_MANUAL_CONFIRMATION_PENDING":
+      return "人工确认待处理";
+    case "LAB_REVIEW_READY":
+      return "正式复盘已就绪";
+    default:
+      return title || "复盘工作流";
+  }
+}
+
+function getLabManualTaskStatusLabel(status) {
+  switch (status) {
+    case "DO_NOW":
+      return "现在先做";
+    case "NEXT":
+      return "然后处理";
+    case "FOLLOW_UP":
+      return "确认后再做";
+    case "DONE":
+      return "已完成";
+    default:
+      return status || "待处理";
+  }
+}
+
+function getLabVerificationStageLabel(stage) {
+  switch (stage) {
+    case "MANUAL_CONFIRMATION_REQUIRED":
+      return "待人工确认";
+    case "MANUAL_CONFIRMED":
+      return "已人工确认";
+    case "OCR_EXTRACTED":
+      return "已 OCR 提取";
+    default:
+      return stage || "待核验";
+  }
+}
+
+function getTrustTimelineStatusLabel(status) {
+  switch (status) {
+    case "DONE":
+      return "已完成";
+    case "IN_PROGRESS":
+      return "进行中";
+    case "PENDING":
+      return "待处理";
+    default:
+      return status || "待处理";
+  }
+}
+
+function getLabFieldSourceLabel(sourceType) {
+  switch (sourceType) {
+    case "MANUAL_CONFIRMATION":
+      return "人工确认";
+    case "OCR_EXTRACTED":
+      return "OCR 提取";
+    default:
+      return sourceType || "待核验";
+  }
+}
+
+function getLabFieldVerificationStatusLabel(status) {
+  switch (status) {
+    case "VERIFIED":
+      return "已核验";
+    case "OCR_READY":
+      return "可直接复盘";
+    case "REVIEW_RECOMMENDED":
+      return "建议复核";
+    default:
+      return status || "待处理";
+  }
+}
+
+function createLabManualIndicatorDraft() {
+  return {
+    code: "",
+    name: "",
+    value: "",
+    unit: "umol/L",
+    referenceRange: "",
+    riskLevel: "YELLOW",
+  };
+}
+
+function getAccountSecurityStateLabel(authUiState) {
+  if (authUiState?.loginLockedMessage) {
+    return "登录已锁定";
+  }
+
+  if (authUiState?.passwordResetCooldownMessage || authUiState?.accountVerificationCooldownMessage) {
+    return "存在限流保护";
+  }
+
+  return "当前正常";
+}
+
+function getAccountSecurityStateTone(authUiState) {
+  if (authUiState?.loginLockedMessage) {
+    return "risk-red";
+  }
+
+  if (authUiState?.passwordResetCooldownMessage || authUiState?.accountVerificationCooldownMessage) {
+    return "risk-yellow";
+  }
+
+  return "risk-green";
 }
 
 function LabReportSelector({ app, data, busyMap, withErrorHandling }) {
@@ -114,6 +228,138 @@ function LabReportSelector({ app, data, busyMap, withErrorHandling }) {
   );
 }
 
+function LabManualTaskGuide({ tasks, blockedOutputs }) {
+  const taskItems = tasks || [];
+  const blockedItems = blockedOutputs || [];
+
+  if (!taskItems.length && !blockedItems.length) {
+    return null;
+  }
+
+  return (
+    <div className="stack-list lab-manual-guide">
+      {taskItems.length ? (
+        <div className="stack-list">
+          <strong className="subtle-title">先按这个顺序处理</strong>
+          {taskItems.map((item, index) => (
+            <article className="list-card lab-task-card" key={item.actionKey || `${item.title}-${index}`}>
+              <div className="result-header">
+                <div>
+                  <strong>{index + 1}. {item.title}</strong>
+                  <p>{item.description}</p>
+                </div>
+                <span className={`inline-tag ${item.priority === "HIGH" ? "risk-yellow" : ""}`}>
+                  {getLabManualTaskStatusLabel(item.status)}
+                </span>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+      {blockedItems.length ? <BulletList title="确认前系统暂不输出" items={blockedItems} /> : null}
+    </div>
+  );
+}
+
+function LabTrustMetaPanel({ trustMeta }) {
+  if (!trustMeta) {
+    return null;
+  }
+
+  return (
+    <div className="stack-list lab-trust-panel">
+      <div className="result-header">
+        <div>
+          <strong>可信链路</strong>
+          <p>把来源、核验阶段和人工确认历史放在同一处，避免未核验结果混入正式复盘。</p>
+        </div>
+        <span className={`inline-tag ${trustMeta.verificationStage === "MANUAL_CONFIRMATION_REQUIRED" ? "risk-yellow" : "risk-green"}`}>
+          {getLabVerificationStageLabel(trustMeta.verificationStage)}
+        </span>
+      </div>
+      <div className="stats-grid stats-grid--compact">
+        <div className="stat-line">
+          <span>报告来源</span>
+          <strong>{trustMeta.documentSourceLabel || "未标记"}</strong>
+        </div>
+        <div className="stat-line">
+          <span>原始文件</span>
+          <strong>{trustMeta.originalFileAttached ? "已保留" : "未保留"}</strong>
+        </div>
+        <div className="stat-line">
+          <span>人工确认时间</span>
+          <strong>{trustMeta.manualConfirmedAt ? formatDateTime(trustMeta.manualConfirmedAt) : "尚未确认"}</strong>
+        </div>
+      </div>
+      <div className="list-card__meta">
+        <span>文件名：{trustMeta.originalFileName || "未记录"}</span>
+        <span>机构来源：{trustMeta.institutionSourceLabel || "待补充"}</span>
+      </div>
+      {trustMeta.lockedSections?.length ? (
+        <BulletList title="当前锁定输出" items={trustMeta.lockedSections} />
+      ) : null}
+      {trustMeta.fieldConfidenceItems?.length ? (
+        <div className="stack-list">
+          <strong className="subtle-title">字段级置信度</strong>
+          <div className="indicator-grid">
+            {trustMeta.fieldConfidenceItems.map((item) => (
+              <article className="indicator-chip" key={`${item.code}-${item.name}-${item.sourceType}`}>
+                <span>{item.name || item.code}</span>
+                <strong>{item.confidenceScore != null ? `${item.confidenceScore} 分` : "待评估"}</strong>
+                <small>{getLabFieldSourceLabel(item.sourceType)} / {getLabFieldVerificationStatusLabel(item.verificationStatus)}</small>
+                <small>{item.note}</small>
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {trustMeta.confirmationHistory?.length ? (
+        <div className="stack-list">
+          <strong className="subtle-title">确认历史</strong>
+          {trustMeta.confirmationHistory.map((item) => (
+            <article className="list-card trust-timeline-card" key={`${item.eventKey}-${item.occurredAt || item.title}`}>
+              <div className="result-header">
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.detail}</p>
+                </div>
+                <span className={`inline-tag ${item.status === "DONE" ? "risk-green" : "risk-yellow"}`}>
+                  {getTrustTimelineStatusLabel(item.status)}
+                </span>
+              </div>
+              {item.occurredAt ? <p className="meta-text">{formatDateTime(item.occurredAt)}</p> : null}
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function LabDoctorSummaryPanel({ doctorSummary }) {
+  if (!doctorSummary) {
+    return null;
+  }
+
+  return (
+    <div className="stack-list lab-doctor-summary">
+      <div className="result-header">
+        <div>
+          <strong>给医生的结构化摘要</strong>
+          <p>先把本次结果、关键变化和复诊诉求整理好，再决定是否直接分享给医生。</p>
+        </div>
+        <span className={`inline-tag ${doctorSummary.readyToShare ? "risk-green" : "risk-yellow"}`}>
+          {doctorSummary.readyToShare ? "可分享" : "暂不建议直接分享"}
+        </span>
+      </div>
+      <p className="narrative-text">{doctorSummary.shareSummary || "当前暂无可分享摘要。"}</p>
+      <ArraySummary title="关键发现" items={doctorSummary.keyFindings} emptyMessage="当前暂无关键发现。" />
+      <ArraySummary title="建议向医生确认" items={doctorSummary.careRequests} emptyMessage="当前暂无需额外确认的问题。" />
+      <BulletList title="分享前提醒" items={doctorSummary.trustNotes} />
+    </div>
+  );
+}
+
 export default function AssistantPage({
   app,
   data,
@@ -128,6 +374,7 @@ export default function AssistantPage({
   handleRevokeSession,
   handleRequestAccountVerificationCode,
   handleConfirmAccountVerification,
+  authUiState,
   medicationDraft,
   setMedicationDraft,
   handleMedicationSubmit,
@@ -163,6 +410,17 @@ export default function AssistantPage({
     logoutOtherSessions: true,
   });
   const [accountVerificationCode, setAccountVerificationCode] = useState("");
+  const [labManualDraft, setLabManualDraft] = useState({
+    indicators: [
+      {
+        ...createLabManualIndicatorDraft(),
+        code: "UA",
+        name: "尿酸",
+        referenceRange: "208-428",
+      },
+    ],
+    summaryNote: "",
+  });
   const medicationItems = data.medication?.currentMedications || [];
   const selectedMedication = medicationItems.find((item) => item.name === medicationCheckinDraft.medicationName) || medicationItems[0] || null;
   const medicationPeriodOptions = selectedMedication ? getMedicationPeriods(selectedMedication.frequency) : ["MORNING"];
@@ -188,6 +446,86 @@ export default function AssistantPage({
       notificationAuthorized: Boolean(data.privacyConsentCurrent.notificationAuthorized),
     });
   }, [data.privacyConsentCurrent]);
+
+  async function handleLabManualConfirm(event) {
+    event.preventDefault();
+
+    if (!data.labResult?.reportId) {
+      app.setBanner({ tone: "warning", message: "当前没有可补录的化验单，请先选择一份待人工确认的报告。" });
+      return;
+    }
+
+    const sanitizedIndicators = (labManualDraft.indicators || [])
+      .map((item) => ({
+        code: item.code.trim(),
+        name: item.name.trim(),
+        value: item.value === "" ? "" : Number(item.value),
+        unit: item.unit.trim(),
+        referenceRange: item.referenceRange.trim(),
+        riskLevel: item.riskLevel,
+      }))
+      .filter((item) => item.code || item.name || item.value !== "" || item.unit || item.referenceRange);
+
+    if (!sanitizedIndicators.length) {
+      app.setBanner({ tone: "warning", message: "请至少补录一项关键指标。" });
+      return;
+    }
+
+    if (sanitizedIndicators.some((item) => !item.name || !item.code || !item.unit || item.value === "" || Number.isNaN(item.value))) {
+      app.setBanner({ tone: "warning", message: "请先补全每一项指标的名称、编码、数值和单位。" });
+      return;
+    }
+
+    await withErrorHandling(async () => {
+      await app.submitLabManualConfirmation(data.labResult.reportId, {
+        indicators: sanitizedIndicators.map((item) => ({
+          code: item.code,
+          name: item.name,
+          value: item.value,
+          unit: item.unit,
+          referenceRange: item.referenceRange || null,
+          riskLevel: item.riskLevel,
+        })),
+        summaryNote: labManualDraft.summaryNote.trim() || null,
+      });
+      setLabManualDraft({
+        indicators: [
+          {
+            ...createLabManualIndicatorDraft(),
+            code: "UA",
+            name: "尿酸",
+            referenceRange: "208-428",
+          },
+        ],
+        summaryNote: "",
+      });
+    });
+  }
+
+  function updateLabManualIndicator(index, key, value) {
+    setLabManualDraft((current) => ({
+      ...current,
+      indicators: current.indicators.map((item, itemIndex) => (
+        itemIndex === index ? { ...item, [key]: value } : item
+      )),
+    }));
+  }
+
+  function addLabManualIndicator() {
+    setLabManualDraft((current) => ({
+      ...current,
+      indicators: [...current.indicators, createLabManualIndicatorDraft()],
+    }));
+  }
+
+  function removeLabManualIndicator(index) {
+    setLabManualDraft((current) => ({
+      ...current,
+      indicators: current.indicators.length === 1
+        ? [createLabManualIndicatorDraft()]
+        : current.indicators.filter((_, itemIndex) => itemIndex !== index),
+    }));
+  }
 
   return (
     <section className="content-section" id="assistant">
@@ -294,6 +632,40 @@ export default function AssistantPage({
               <div className="session-card">
                 <div className="result-header">
                   <div>
+                    <strong>安全状态摘要</strong>
+                    <p>
+                      {authUiState?.loginLockedMessage
+                        || authUiState?.accountVerificationCooldownMessage
+                        || authUiState?.passwordResetCooldownMessage
+                        || "当前未触发登录锁定或验证码限流，账户安全链路处于正常状态。"}
+                    </p>
+                  </div>
+                  <span className={`inline-tag ${getAccountSecurityStateTone(authUiState)}`}>
+                    {getAccountSecurityStateLabel(authUiState)}
+                  </span>
+                </div>
+                <div className="stats-grid stats-grid--compact">
+                  <div className="stat-line">
+                    <span>登录锁定</span>
+                    <strong>{authUiState?.loginLockedMessage ? "已触发" : "未触发"}</strong>
+                  </div>
+                  <div className="stat-line">
+                    <span>找回密码限流</span>
+                    <strong>{authUiState?.passwordResetCooldownMessage ? "冷却中" : "正常"}</strong>
+                  </div>
+                  <div className="stat-line">
+                    <span>账号验证限流</span>
+                    <strong>{authUiState?.accountVerificationCooldownMessage ? "冷却中" : "正常"}</strong>
+                  </div>
+                </div>
+                {authUiState?.loginLockedAt ? <p className="meta-text">最近锁定：{formatDateTime(authUiState.loginLockedAt)}</p> : null}
+                {authUiState?.passwordResetCooldownAt ? <p className="meta-text">找回密码限流触发：{formatDateTime(authUiState.passwordResetCooldownAt)}</p> : null}
+                {authUiState?.accountVerificationCooldownAt ? <p className="meta-text">账号验证限流触发：{formatDateTime(authUiState.accountVerificationCooldownAt)}</p> : null}
+                {authUiState?.lastErrorCode ? <p className="meta-text">最近后端状态码：{authUiState.lastErrorCode}</p> : null}
+              </div>
+              <div className="session-card">
+                <div className="result-header">
+                  <div>
                     <strong>账号验证状态</strong>
                     <p>{accountVerificationStatus.accountIdentifier || data.authSession?.accountIdentifier || "当前正式账号"}</p>
                   </div>
@@ -316,12 +688,17 @@ export default function AssistantPage({
                         className="ghost-button"
                         type="button"
                         disabled={!session || busyMap.accountVerificationRequest}
-                        onClick={() => withErrorHandling(() => handleRequestAccountVerificationCode())}
+                        onClick={handleRequestAccountVerificationCode}
                       >
                         {busyMap.accountVerificationRequest ? "发送中..." : "发送验证验证码"}
                       </button>
-                      <span className="meta-text">当前为安全骨架，联调验证码会在页面提示条中展示。</span>
+                      <span className="meta-text">
+                        {authUiState?.accountVerificationCooldownMessage || "当前为安全骨架，联调验证码会在页面提示条中展示。"}
+                      </span>
                     </div>
+                    {authUiState?.accountVerificationCooldownAt ? (
+                      <p className="meta-text">最近限流：{formatDateTime(authUiState.accountVerificationCooldownAt)}</p>
+                    ) : null}
                     <label>
                       <span>验证码</span>
                       <input
@@ -956,6 +1333,13 @@ export default function AssistantPage({
                     <strong>{data.labResult.manualConfirmationRequired ? "需要" : "不需要"}</strong>
                   </div>
                 </div>
+                {data.labReview?.workflowTitle ? (
+                  <div className="action-row">
+                    <span className={`inline-tag ${data.labReview.reviewReady ? "risk-green" : "risk-yellow"}`}>
+                      {getLabWorkflowTitleLabel(data.labReview.workflowTitle)}
+                    </span>
+                  </div>
+                ) : null}
                 {data.labResult.manualConfirmationRequired ? (
                   <div className="result-panel">
                     <p className="narrative-text">
@@ -998,6 +1382,9 @@ export default function AssistantPage({
                         </div>
                         <div className="list-card__meta">
                           <span>复盘状态：{getLabReviewStatusLabel(data.labReview.reviewStatus, data.labReview.reviewReady)}</span>
+                          <span>工作流：{getLabWorkflowTitleLabel(data.labReview.workflowTitle)}</span>
+                        </div>
+                        <div className="list-card__meta">
                           <span>
                             对比报告：
                             {data.labReview.comparedReportDate ? formatDate(data.labReview.comparedReportDate) : "暂无"}
@@ -1022,18 +1409,138 @@ export default function AssistantPage({
                         <BulletList title="复查建议" items={data.labReview.followUpRecommendation ? [data.labReview.followUpRecommendation] : []} />
                         <BulletList title="下一步三件事" items={data.labReview.nextActions} />
                         <BulletList title="可信边界" items={data.labReview.trustNotes} />
+                        <LabTrustMetaPanel trustMeta={data.labReview.trustMeta} />
+                        <LabDoctorSummaryPanel doctorSummary={data.labReview.doctorSummary} />
                       </>
                     ) : (
                       <>
                         <div className="action-row">
+                          <span className="inline-tag">{getLabWorkflowTitleLabel(data.labReview.workflowTitle)}</span>
                           <span className="inline-tag risk-yellow">{getLabReviewStatusLabel(data.labReview.reviewStatus, data.labReview.reviewReady)}</span>
                           {data.labReview.manualConfirmationRequired ? <span className="inline-tag">等待补充清晰报告</span> : null}
                         </div>
                         <p className="narrative-text">{data.labReview.reviewSummary}</p>
                         <p className="narrative-text">{data.labReview.targetConclusion}</p>
+                        <LabManualTaskGuide
+                          tasks={data.labReview.manualConfirmationTasks}
+                          blockedOutputs={data.labReview.blockedOutputs}
+                        />
+                        <form className="stack-form compact-form" onSubmit={handleLabManualConfirm}>
+                          <div className="result-header">
+                            <div>
+                              <strong>手动补录关键指标</strong>
+                              <p>支持一次补录多项关键指标。先把尿酸和本次异常项补齐，再切回正式复盘链路。</p>
+                            </div>
+                            <span className="inline-tag risk-yellow">优先补录</span>
+                          </div>
+                          <div className="stack-list">
+                            {labManualDraft.indicators.map((indicator, index) => (
+                              <article className="list-card lab-manual-indicator-row" key={`lab-manual-${index}`}>
+                                <div className="result-header">
+                                  <div>
+                                    <strong>指标 {index + 1}</strong>
+                                    <p>按原始化验单逐项补录，至少保证名称、编码、数值和单位完整。</p>
+                                  </div>
+                                  <div className="action-row">
+                                    {labManualDraft.indicators.length > 1 ? (
+                                      <button
+                                        className="ghost-button action-button"
+                                        type="button"
+                                        onClick={() => removeLabManualIndicator(index)}
+                                      >
+                                        删除这一项
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <label>
+                                  <span>指标名称</span>
+                                  <input
+                                    value={indicator.name}
+                                    onChange={(event) => updateLabManualIndicator(index, "name", event.target.value)}
+                                    placeholder="例如：尿酸"
+                                  />
+                                </label>
+                                <label>
+                                  <span>指标编码</span>
+                                  <input
+                                    value={indicator.code}
+                                    onChange={(event) => updateLabManualIndicator(index, "code", event.target.value)}
+                                    placeholder="例如：UA"
+                                  />
+                                </label>
+                                <label>
+                                  <span>数值</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={indicator.value}
+                                    onChange={(event) => updateLabManualIndicator(index, "value", event.target.value)}
+                                    placeholder="例如：428"
+                                  />
+                                </label>
+                                <label>
+                                  <span>单位</span>
+                                  <input
+                                    value={indicator.unit}
+                                    onChange={(event) => updateLabManualIndicator(index, "unit", event.target.value)}
+                                    placeholder="例如：umol/L"
+                                  />
+                                </label>
+                                <label>
+                                  <span>参考范围</span>
+                                  <input
+                                    value={indicator.referenceRange}
+                                    onChange={(event) => updateLabManualIndicator(index, "referenceRange", event.target.value)}
+                                    placeholder="例如：208-428"
+                                  />
+                                </label>
+                                <label>
+                                  <span>风险等级</span>
+                                  <select
+                                    value={indicator.riskLevel}
+                                    onChange={(event) => updateLabManualIndicator(index, "riskLevel", event.target.value)}
+                                  >
+                                    <option value="GREEN">低风险 / 正常</option>
+                                    <option value="YELLOW">中风险 / 偏高</option>
+                                    <option value="RED">高风险 / 明显异常</option>
+                                  </select>
+                                </label>
+                              </article>
+                            ))}
+                          </div>
+                          <div className="action-row">
+                            <button className="ghost-button action-button" type="button" onClick={addLabManualIndicator}>
+                              新增一项指标
+                            </button>
+                            <span className="meta-text">建议至少补录尿酸和本次异常指标，减少后续医生复核成本。</span>
+                          </div>
+                          <label>
+                            <span>补录备注</span>
+                            <textarea
+                              rows="3"
+                              value={labManualDraft.summaryNote}
+                              onChange={(event) => setLabManualDraft((current) => ({ ...current, summaryNote: event.target.value }))}
+                              placeholder="例如：依据原始化验单手动核对，OCR 未识别出尿酸这一项。"
+                            />
+                          </label>
+                          <div className="action-row">
+                            <button
+                              className="primary-button"
+                              type="submit"
+                              disabled={!session || busyMap.labManualConfirm || !data.labResult?.reportId}
+                            >
+                              {busyMap.labManualConfirm ? "提交中..." : "确认补录并生成复盘"}
+                            </button>
+                            <span className="meta-text">补录成功后，这份报告会自动切换到正式复盘结果。</span>
+                          </div>
+                        </form>
                         <ArraySummary title="当前状态" items={data.labReview.keyChanges} emptyMessage="当前暂无可复盘指标。" />
                         <BulletList title="下一步三件事" items={data.labReview.nextActions} />
                         <BulletList title="可信边界" items={data.labReview.trustNotes} />
+                        <LabTrustMetaPanel trustMeta={data.labReview.trustMeta} />
+                        <LabDoctorSummaryPanel doctorSummary={data.labReview.doctorSummary} />
                       </>
                     )}
                   </>

@@ -204,6 +204,8 @@ CREATE TABLE lab_report_record (
     indicators_json JSON NOT NULL,
     overall_risk_level VARCHAR(16) NOT NULL,
     suggestions_json JSON NOT NULL,
+    manual_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    manual_confirmed_at DATETIME NULL,
     summary_text VARCHAR(500) NOT NULL,
     KEY idx_lab_user_code (user_code)
 );

@@ -62,6 +62,21 @@ function HeroMetrics({ overview }) {
   );
 }
 
+function createInitialAuthUiState() {
+  return {
+    lastErrorCode: "",
+    lastErrorMessage: "",
+    loginLockedMessage: "",
+    loginLockedAt: "",
+    invalidCredentialsMessage: "",
+    invalidCredentialsAt: "",
+    passwordResetCooldownMessage: "",
+    passwordResetCooldownAt: "",
+    accountVerificationCooldownMessage: "",
+    accountVerificationCooldownAt: "",
+  };
+}
+
 export default function App() {
   const app = useTongfengApp();
   const { data, busyMap, session } = app;
@@ -149,6 +164,7 @@ export default function App() {
   const [recordEditDraft, setRecordEditDraft] = useState({});
   const [recordChangeReason, setRecordChangeReason] = useState("");
   const [recordRestoreReason, setRecordRestoreReason] = useState("回滚到此前版本");
+  const [authUiState, setAuthUiState] = useState(() => createInitialAuthUiState());
 
   useEffect(() => {
     setProfileDraft(app.profileForm);
@@ -280,6 +296,82 @@ export default function App() {
     return keys(formData);
   }
 
+  function clearLoginSecurityState() {
+    setAuthUiState((current) => ({
+      ...current,
+      lastErrorCode: "",
+      lastErrorMessage: "",
+      loginLockedMessage: "",
+      loginLockedAt: "",
+      invalidCredentialsMessage: "",
+      invalidCredentialsAt: "",
+    }));
+  }
+
+  function clearVerificationSecurityState(scope) {
+    setAuthUiState((current) => {
+      if (scope === "PASSWORD_RESET") {
+        return {
+          ...current,
+          lastErrorCode: current.lastErrorCode === "VERIFICATION_CODE_COOLDOWN" ? "" : current.lastErrorCode,
+          lastErrorMessage: current.lastErrorCode === "VERIFICATION_CODE_COOLDOWN" ? "" : current.lastErrorMessage,
+          passwordResetCooldownMessage: "",
+          passwordResetCooldownAt: "",
+        };
+      }
+
+      if (scope === "ACCOUNT_VERIFICATION") {
+        return {
+          ...current,
+          lastErrorCode: current.lastErrorCode === "VERIFICATION_CODE_COOLDOWN" ? "" : current.lastErrorCode,
+          lastErrorMessage: current.lastErrorCode === "VERIFICATION_CODE_COOLDOWN" ? "" : current.lastErrorMessage,
+          accountVerificationCooldownMessage: "",
+          accountVerificationCooldownAt: "",
+        };
+      }
+
+      return current;
+    });
+  }
+
+  function syncAuthUiStateFromError(error, scope) {
+    const now = new Date().toISOString();
+    const nextCode = error?.code || "";
+    const nextMessage = error?.message || "请求失败，请稍后再试。";
+
+    setAuthUiState((current) => {
+      const nextState = {
+        ...current,
+        lastErrorCode: nextCode,
+        lastErrorMessage: nextMessage,
+      };
+
+      if (scope === "LOGIN") {
+        if (nextCode === "ACCOUNT_LOGIN_LOCKED") {
+          nextState.loginLockedMessage = nextMessage;
+          nextState.loginLockedAt = now;
+          nextState.invalidCredentialsMessage = "";
+          nextState.invalidCredentialsAt = "";
+        } else if (nextCode === "INVALID_CREDENTIALS") {
+          nextState.invalidCredentialsMessage = nextMessage;
+          nextState.invalidCredentialsAt = now;
+        }
+      }
+
+      if (scope === "PASSWORD_RESET" && nextCode === "VERIFICATION_CODE_COOLDOWN") {
+        nextState.passwordResetCooldownMessage = nextMessage;
+        nextState.passwordResetCooldownAt = now;
+      }
+
+      if (scope === "ACCOUNT_VERIFICATION" && nextCode === "VERIFICATION_CODE_COOLDOWN") {
+        nextState.accountVerificationCooldownMessage = nextMessage;
+        nextState.accountVerificationCooldownAt = now;
+      }
+
+      return nextState;
+    });
+  }
+
   async function handlePasswordLogin(event) {
     event.preventDefault();
     if (!loginDraft.account.trim() || !loginDraft.password.trim()) {
@@ -287,11 +379,17 @@ export default function App() {
       return;
     }
 
-    await withErrorHandling(() => app.login({
-      accountType: loginDraft.accountType,
-      account: loginDraft.account.trim(),
-      password: loginDraft.password,
-    }));
+    try {
+      await app.login({
+        accountType: loginDraft.accountType,
+        account: loginDraft.account.trim(),
+        password: loginDraft.password,
+      });
+      clearLoginSecurityState();
+    } catch (error) {
+      syncAuthUiStateFromError(error, "LOGIN");
+      app.setBanner({ tone: "danger", message: error.message });
+    }
   }
 
   async function handleRegister(event) {
@@ -306,22 +404,27 @@ export default function App() {
       return;
     }
 
-    await withErrorHandling(() => app.register({
-      nickname: registerDraft.nickname.trim(),
-      accountType: registerDraft.accountType,
-      account: registerDraft.account.trim(),
-      password: registerDraft.password,
-      confirmPassword: registerDraft.confirmPassword,
-      consent: {
-        consentVersion: registerDraft.consentVersion,
-        privacyPolicyVersion: registerDraft.privacyPolicyVersion,
-        privacyAccepted: registerDraft.privacyAccepted,
-        termsAccepted: registerDraft.termsAccepted,
-        medicalDataAuthorized: registerDraft.medicalDataAuthorized,
-        familyCollaborationAuthorized: registerDraft.familyCollaborationAuthorized,
-        notificationAuthorized: registerDraft.notificationAuthorized,
-      },
-    }));
+    try {
+      await app.register({
+        nickname: registerDraft.nickname.trim(),
+        accountType: registerDraft.accountType,
+        account: registerDraft.account.trim(),
+        password: registerDraft.password,
+        confirmPassword: registerDraft.confirmPassword,
+        consent: {
+          consentVersion: registerDraft.consentVersion,
+          privacyPolicyVersion: registerDraft.privacyPolicyVersion,
+          privacyAccepted: registerDraft.privacyAccepted,
+          termsAccepted: registerDraft.termsAccepted,
+          medicalDataAuthorized: registerDraft.medicalDataAuthorized,
+          familyCollaborationAuthorized: registerDraft.familyCollaborationAuthorized,
+          notificationAuthorized: registerDraft.notificationAuthorized,
+        },
+      });
+      setAuthUiState(createInitialAuthUiState());
+    } catch (error) {
+      app.setBanner({ tone: "danger", message: error.message });
+    }
   }
 
   async function handleMockLogin(event) {
@@ -344,18 +447,22 @@ export default function App() {
       return;
     }
 
-    await withErrorHandling(async () => {
+    try {
       await app.requestVerificationCode({
         purpose: "PASSWORD_RESET",
         accountType: resetDraft.accountType,
         account: resetDraft.account.trim(),
       });
+      clearVerificationSecurityState("PASSWORD_RESET");
       setResetDraft((current) => ({
         ...current,
         account: current.account.trim(),
         requestedAt: new Date().toISOString(),
       }));
-    });
+    } catch (error) {
+      syncAuthUiStateFromError(error, "PASSWORD_RESET");
+      app.setBanner({ tone: "danger", message: error.message });
+    }
   }
 
   async function handlePasswordResetConfirm(event) {
@@ -371,7 +478,7 @@ export default function App() {
       return;
     }
 
-    await withErrorHandling(async () => {
+    try {
       await app.confirmPasswordReset({
         accountType: resetDraft.accountType,
         account: resetDraft.account.trim(),
@@ -379,6 +486,7 @@ export default function App() {
         newPassword: resetDraft.newPassword,
         confirmPassword: resetDraft.confirmPassword,
       });
+      clearVerificationSecurityState("PASSWORD_RESET");
       setLoginDraft((current) => ({
         ...current,
         accountType: resetDraft.accountType,
@@ -392,7 +500,9 @@ export default function App() {
         confirmPassword: "",
       }));
       setAuthMode("login");
-    });
+    } catch (error) {
+      app.setBanner({ tone: "danger", message: error.message });
+    }
   }
 
   async function handlePasswordChange(payload) {
@@ -410,7 +520,13 @@ export default function App() {
   }
 
   async function handleRequestAccountVerificationCode() {
-    await withErrorHandling(() => app.requestAccountVerificationCode());
+    try {
+      await app.requestAccountVerificationCode();
+      clearVerificationSecurityState("ACCOUNT_VERIFICATION");
+    } catch (error) {
+      syncAuthUiStateFromError(error, "ACCOUNT_VERIFICATION");
+      app.setBanner({ tone: "danger", message: error.message });
+    }
   }
 
   async function handleConfirmAccountVerification(verificationCode) {
@@ -422,6 +538,7 @@ export default function App() {
 
     try {
       await app.confirmAccountVerification({ verificationCode: code });
+      clearVerificationSecurityState("ACCOUNT_VERIFICATION");
       return true;
     } catch (error) {
       app.setBanner({ tone: "danger", message: error.message });
@@ -920,6 +1037,31 @@ export default function App() {
                 <button className="ghost-button" type="button" onClick={() => setAuthMode("reset")}>
                   忘记密码
                 </button>
+                <div className="session-card">
+                  <div className="result-header">
+                    <div>
+                      <strong>登录保护状态</strong>
+                      <p>
+                        {authUiState.loginLockedMessage
+                          || authUiState.invalidCredentialsMessage
+                          || "当前未触发登录锁定，可继续尝试登录。"}
+                      </p>
+                    </div>
+                    <span className={`inline-tag ${authUiState.loginLockedMessage ? "risk-red" : authUiState.invalidCredentialsMessage ? "risk-yellow" : "risk-green"}`}>
+                      {authUiState.loginLockedMessage ? "已锁定" : authUiState.invalidCredentialsMessage ? "最近失败" : "可登录"}
+                    </span>
+                  </div>
+                  <p className="meta-text">
+                    {authUiState.loginLockedAt
+                      ? `最近锁定：${formatDateTime(authUiState.loginLockedAt)}`
+                      : authUiState.invalidCredentialsAt
+                        ? `最近失败：${formatDateTime(authUiState.invalidCredentialsAt)}`
+                        : "如果后端触发连续失败保护，这里会直接显示锁定状态与等待时长。"}
+                  </p>
+                  {authUiState.loginLockedMessage || authUiState.invalidCredentialsMessage ? (
+                    <p className="meta-text">最近状态码：{authUiState.lastErrorCode || "-"}</p>
+                  ) : null}
+                </div>
               </form>
             ) : authMode === "register" ? (
               <form className="stack-form" onSubmit={handleRegister}>
@@ -1033,6 +1175,30 @@ export default function App() {
                   <span className="meta-text">
                     {resetDraft.requestedAt ? `最近发送：${formatDateTime(resetDraft.requestedAt)}` : "当前为模拟投递骨架，联调时会在提示条显示验证码。"}
                   </span>
+                </div>
+                <div className="session-card">
+                  <div className="result-header">
+                    <div>
+                      <strong>验证码发送状态</strong>
+                      <p>
+                        {authUiState.passwordResetCooldownMessage
+                          || (resetDraft.requestedAt
+                            ? "验证码已请求，请留意页面提示条或真实投递渠道。"
+                            : "当前尚未触发验证码发送。")}
+                      </p>
+                    </div>
+                    <span className={`inline-tag ${authUiState.passwordResetCooldownMessage ? "risk-yellow" : resetDraft.requestedAt ? "risk-green" : ""}`}>
+                      {authUiState.passwordResetCooldownMessage ? "冷却中" : resetDraft.requestedAt ? "已发送" : "待发送"}
+                    </span>
+                  </div>
+                  <p className="meta-text">
+                    {authUiState.passwordResetCooldownAt
+                      ? `最近限流：${formatDateTime(authUiState.passwordResetCooldownAt)}`
+                      : resetDraft.requestedAt
+                        ? `最近请求：${formatDateTime(resetDraft.requestedAt)}`
+                        : "后端若触发验证码限流，这里会直接显示等待提示。"}
+                  </p>
+                  {authUiState.passwordResetCooldownMessage ? <p className="meta-text">状态码：VERIFICATION_CODE_COOLDOWN</p> : null}
                 </div>
                 <label>
                   <span>验证码</span>
@@ -1186,6 +1352,7 @@ export default function App() {
                 handleRevokeSession={handleRevokeSession}
                 handleRequestAccountVerificationCode={handleRequestAccountVerificationCode}
                 handleConfirmAccountVerification={handleConfirmAccountVerification}
+                authUiState={authUiState}
                 medicationDraft={medicationDraft}
                 setMedicationDraft={setMedicationDraft}
                 handleMedicationSubmit={handleMedicationSubmit}
