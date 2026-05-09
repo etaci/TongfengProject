@@ -158,6 +158,23 @@ public final class AppContracts {
 	) {
 	}
 
+	public record ErrorCodeItemResponse(
+			String code,
+			int httpStatus,
+			String httpStatusText,
+			String category,
+			boolean retryable,
+			String defaultMessage
+	) {
+	}
+
+	public record ErrorCodeCatalogResponse(
+			String version,
+			Instant generatedAt,
+			List<ErrorCodeItemResponse> items
+	) {
+	}
+
 	public record AuthActiveSessionResponse(
 			String sessionCode,
 			String authMode,
@@ -297,7 +314,9 @@ public final class AppContracts {
 			Integer purineEstimateMg,
 			List<MealItem> items,
 			List<String> suggestions,
-			String summary
+			String summary,
+			String analysisMode,
+			List<String> trustNotes
 	) {
 	}
 
@@ -664,7 +683,8 @@ public final class AppContracts {
 			String extractionStatus,
 			List<String> suggestions,
 			List<String> trustNotes,
-			String summary
+			String summary,
+			String analysisMode
 	) {
 	}
 

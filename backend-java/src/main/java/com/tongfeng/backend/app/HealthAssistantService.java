@@ -648,7 +648,9 @@ public class HealthAssistantService {
 				recordEntity.getPurineEstimateMg(),
 				readMealItems(recordEntity.getItemsJson()),
 				readStringList(recordEntity.getSuggestionsJson()),
-				recordEntity.getSummaryText()
+				recordEntity.getSummaryText(),
+				defaultString(aiResult.analysisMode(), AiServiceClient.MEAL_ANALYSIS_MODE_AI_VISION),
+				safeList(aiResult.trustNotes())
 		);
 	}
 
@@ -2998,7 +3000,8 @@ public class HealthAssistantService {
 				record.isManualConfirmed() ? "MANUAL_CONFIRMED" : (reviewReady ? "OCR_EXTRACTED" : "MANUAL_CONFIRMATION_REQUIRED"),
 				readStringList(record.getSuggestionsJson()),
 				buildLabAnalyzeTrustNotes(record, indicators),
-				record.getSummaryText()
+				record.getSummaryText(),
+				resolveLabAnalysisMode(record, indicators)
 		);
 	}
 
@@ -3474,6 +3477,20 @@ public class HealthAssistantService {
 				"当前结果基于 OCR 提取到的指标生成，仍需结合原始化验单和医生意见确认。",
 				"如果关键指标缺失或图像不清晰，请重新上传后再复盘。"
 		);
+	}
+
+	private String resolveLabAnalysisMode(LabReportRecordEntity record, List<AppContracts.LabIndicator> indicators) {
+		if (record.isManualConfirmed()) {
+			return "MANUAL_CONFIRMED";
+		}
+		if (isLabSafeFallback(record)) {
+			return AiServiceClient.LAB_ANALYSIS_MODE_SAFE_FALLBACK;
+		}
+		return isLabReviewReady(indicators) ? AiServiceClient.LAB_ANALYSIS_MODE_AI_OCR : "MANUAL_CONFIRMATION_REQUIRED";
+	}
+
+	private boolean isLabSafeFallback(LabReportRecordEntity record) {
+		return readStringList(record.getSuggestionsJson()).stream().anyMatch(item -> item != null && item.contains("AI 子服务当前不可用"));
 	}
 
 	private boolean isLabReviewReady(List<AppContracts.LabIndicator> indicators) {

@@ -1,0 +1,69 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: tongfeng-mysql
+    environment:
+      MYSQL_DATABASE: tongfeng
+      MYSQL_USER: tongfeng
+      MYSQL_PASSWORD: tongfeng
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  backend-ai:
+    build:
+      context: ./backend-ai
+    container_name: tongfeng-backend-ai
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  backend-java:
+    build:
+      context: ./backend-java
+    container_name: tongfeng-backend-java
+    depends_on:
+      mysql:
+        condition: service_healthy
+      backend-ai:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/tongfeng?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
+      DB_USERNAME: tongfeng
+      DB_PASSWORD: tongfeng
+      DB_DRIVER: com.mysql.cj.jdbc.Driver
+      AI_BASE_URL: http://backend-ai:8001
+      REDIS_ENABLED: "false"
+      WEATHER_LIVE_ENABLED: "false"
+      APP_STORAGE_ROOT: /app/storage
+    ports:
+      - "8080:8080"
+    volumes:
+      - java-storage:/app/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://127.0.0.1:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  mysql-data:
+  java-storage:

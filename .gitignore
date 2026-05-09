@@ -7,3 +7,6 @@ backend-java.zip
 gradle-8.14.4-bin.zip
 backend-ai/__pycache__/
 backend-ai/.venv/
+backend-java/target/
+frontend-web/dist/
+*.dumpstream

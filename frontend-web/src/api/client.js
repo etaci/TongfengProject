@@ -148,6 +148,7 @@ export async function apiRequest(path, options = {}, session = null) {
     error.status = response.status;
     error.payload = payload;
     error.data = payload?.data ?? null;
+    error.traceId = payload?.traceId || response.headers.get("X-Trace-Id") || "";
     throw error;
   }
 

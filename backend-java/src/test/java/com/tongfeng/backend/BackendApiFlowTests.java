@@ -2,6 +2,7 @@ package com.tongfeng.backend;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -515,7 +517,7 @@ class BackendApiFlowTests {
 
 		mockMvc.perform(get("/api/v1/family/patients/{patientUserId}/weekly-report?days=7", patientUserId)
 						.header("Authorization", "Bearer " + familyToken))
-				.andExpect(status().isBadRequest())
+				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.code").value("WEEKLY_REPORT_DISABLED"));
 
 		MvcResult metricsResult = mockMvc.perform(get("/api/v1/mvp/metrics/summary?days=7")
@@ -748,7 +750,7 @@ class BackendApiFlowTests {
 								  "account": "cooldown-user@example.com"
 								}
 								"""))
-				.andExpect(status().isBadRequest())
+				.andExpect(status().isTooManyRequests())
 				.andExpect(jsonPath("$.code").value("VERIFICATION_CODE_COOLDOWN"));
 	}
 
@@ -920,7 +922,7 @@ class BackendApiFlowTests {
 								  "password": "Password123"
 								}
 								"""))
-				.andExpect(status().isBadRequest())
+				.andExpect(status().isTooManyRequests())
 				.andExpect(jsonPath("$.code").value("ACCOUNT_LOGIN_LOCKED"))
 				.andExpect(jsonPath("$.message", containsString("15")));
 	}
@@ -1273,7 +1275,7 @@ class BackendApiFlowTests {
 
 		mockMvc.perform(get("/api/v1/profile")
 						.header("Authorization", "Bearer " + token))
-				.andExpect(status().isBadRequest())
+				.andExpect(status().isUnauthorized())
 				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
 		mockMvc.perform(post("/api/v1/auth/login")
@@ -1359,7 +1361,7 @@ class BackendApiFlowTests {
 
 		mockMvc.perform(get("/api/v1/profile")
 						.header("Authorization", "Bearer " + firstToken))
-				.andExpect(status().isBadRequest())
+				.andExpect(status().isUnauthorized())
 				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
 		mockMvc.perform(post("/api/v1/auth/login")
@@ -1398,7 +1400,7 @@ class BackendApiFlowTests {
 
 		mockMvc.perform(get("/api/v1/profile")
 						.header("Authorization", "Bearer " + secondToken))
-				.andExpect(status().isBadRequest())
+				.andExpect(status().isUnauthorized())
 				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
 		mockMvc.perform(get("/api/v1/auth/sessions")
@@ -1409,5 +1411,210 @@ class BackendApiFlowTests {
 
 		assertTrue(!firstSessionCode.isBlank());
 		assertTrue(!secondSessionCode.isBlank());
+	}
+
+	@Test
+	void shouldFallbackMealAnalyzeWhenAiServiceUnavailable() throws Exception {
+		MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "meal-fallback-user"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		String token = objectMapper.readTree(loginResult.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		MockMultipartFile file = new MockMultipartFile(
+				"file",
+				"meal.jpg",
+				MediaType.IMAGE_JPEG_VALUE,
+				"fake meal payload".getBytes()
+		);
+
+		mockMvc.perform(multipart("/api/v1/meals/analyze")
+						.file(file)
+						.param("mealType", "DINNER")
+						.param("note", "beer and seafood")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.analysisMode").value("SAFE_FALLBACK"))
+				.andExpect(jsonPath("$.data.riskLevel").value("YELLOW"))
+				.andExpect(jsonPath("$.data.items").isEmpty())
+				.andExpect(jsonPath("$.data.trustNotes[0]").isNotEmpty())
+				.andExpect(jsonPath("$.data.summary", containsString("安全兜底模式")));
+	}
+
+	@Test
+	void shouldFallbackLabAnalyzeIntoManualConfirmationWhenAiServiceUnavailable() throws Exception {
+		MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "lab-fallback-user"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		String token = objectMapper.readTree(loginResult.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		MockMultipartFile file = new MockMultipartFile(
+				"file",
+				"lab.pdf",
+				MediaType.APPLICATION_PDF_VALUE,
+				"fake lab payload".getBytes()
+		);
+
+		MvcResult analyzeResult = mockMvc.perform(multipart("/api/v1/lab-reports/analyze")
+						.file(file)
+						.param("reportDate", "2026-05-09")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.analysisMode").value("SAFE_FALLBACK"))
+				.andExpect(jsonPath("$.data.manualConfirmationRequired").value(true))
+				.andExpect(jsonPath("$.data.reviewReady").value(false))
+				.andExpect(jsonPath("$.data.extractionStatus").value("MANUAL_CONFIRMATION_REQUIRED"))
+				.andExpect(jsonPath("$.data.suggestions[0]", containsString("AI 子服务当前不可用")))
+				.andReturn();
+
+		String reportId = objectMapper.readTree(analyzeResult.getResponse().getContentAsString())
+				.path("data")
+				.path("reportId")
+				.asText();
+
+		mockMvc.perform(get("/api/v1/lab-reports/{reportId}/review", reportId)
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.manualConfirmationRequired").value(true))
+				.andExpect(jsonPath("$.data.reviewReady").value(false))
+				.andExpect(jsonPath("$.data.reviewStatus").value("MANUAL_CONFIRMATION_REQUIRED"));
+	}
+
+	@Test
+	void shouldExposePublicErrorCodeCatalog() throws Exception {
+		mockMvc.perform(get("/api/public/error-codes"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.version").value("2026-05"))
+				.andExpect(jsonPath("$.data.items[*].code", hasItem("UNAUTHORIZED")))
+				.andExpect(jsonPath("$.data.items[*].code", hasItem("FILE_NOT_FOUND")))
+				.andExpect(jsonPath("$.data.items[*].code", hasItem("VERIFICATION_DELIVERY_UNAVAILABLE")));
+	}
+
+	@Test
+	void shouldUseRegisteredHttpStatusForFileNotFound() throws Exception {
+		MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "error-code-user"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		String token = objectMapper.readTree(loginResult.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		mockMvc.perform(get("/api/v1/files/not-exists")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("FILE_NOT_FOUND"));
+	}
+
+	@Test
+	void shouldExposeOpenApiAndTraceIdForErrors() throws Exception {
+		mockMvc.perform(get("/api/openapi"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.openapi").isNotEmpty())
+				.andExpect(jsonPath("$.info.title").value("Tongfeng Backend API"))
+				.andExpect(jsonPath("$.paths['/api/public/error-codes'].get.summary").value("获取后端错误码字典"));
+
+		mockMvc.perform(get("/swagger-ui"))
+				.andExpect(status().is3xxRedirection())
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/swagger-ui.html"));
+
+		mockMvc.perform(get("/api/v1/profile"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+				.andExpect(jsonPath("$.traceId").isNotEmpty())
+				.andExpect(jsonPath("$.path").value("/api/v1/profile"))
+				.andExpect(jsonPath("$.message").isNotEmpty())
+				.andExpect(jsonPath("$.timestamp").isNotEmpty())
+				.andExpect(jsonPath("$.success").value(false))
+				.andExpect(jsonPath("$.traceId").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.blankOrNullString())))
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().exists("X-Trace-Id"));
+	}
+
+	@Test
+	void shouldExposeOpenApiExamplesForCriticalClientFlows() throws Exception {
+		MvcResult openApiResult = mockMvc.perform(get("/api/openapi"))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		JsonNode openApiBody = objectMapper.readTree(openApiResult.getResponse().getContentAsString());
+		assertEquals(
+				"#/components/examples/loginRequestExample",
+				openApiBody.path("paths")
+						.path("/api/v1/auth/login")
+						.path("post")
+						.path("requestBody")
+						.path("content")
+						.path("application/json")
+						.path("examples")
+						.path("login")
+						.path("$ref")
+						.asText()
+		);
+		assertEquals(
+				"#/components/examples/mealAnalyzeMultipartExample",
+				openApiBody.path("paths")
+						.path("/api/v1/meals/analyze")
+						.path("post")
+						.path("requestBody")
+						.path("content")
+						.path("multipart/form-data")
+						.path("examples")
+						.path("mealAnalyze")
+						.path("$ref")
+						.asText()
+		);
+		assertEquals(
+				"#/components/examples/labAnalyzeFallbackResponseExample",
+				openApiBody.path("paths")
+						.path("/api/v1/lab-reports/analyze")
+						.path("post")
+						.path("responses")
+						.path("200")
+						.path("content")
+						.path("application/json")
+						.path("examples")
+						.path("success")
+						.path("$ref")
+						.asText()
+		);
+		assertEquals(
+				"#/components/examples/labManualConfirmationRequestExample",
+				openApiBody.path("paths")
+						.path("/api/v1/lab-reports/{reportId}/manual-confirmation")
+						.path("put")
+						.path("requestBody")
+						.path("content")
+						.path("application/json")
+						.path("examples")
+						.path("labManualConfirmation")
+						.path("$ref")
+						.asText()
+		);
 	}
 }

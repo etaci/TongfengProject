@@ -1,5 +1,7 @@
 package com.tongfeng.backend.app;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Validated
 @RestController
+@Tag(name = "健康档案")
 public class CoreController {
 
 	private final HealthAssistantService healthAssistantService;
@@ -60,6 +63,7 @@ public class CoreController {
 	}
 
 	@PostMapping(value = "/api/v1/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@Operation(summary = "上传原始文件", description = "上传餐盘图、化验单 PDF 或图片等原始文件，供后续分析与人工复核使用。")
 	public ApiResponse<AppContracts.FileUploadResponse> uploadFile(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@RequestPart("file") MultipartFile file
@@ -81,6 +85,7 @@ public class CoreController {
 	}
 
 	@PostMapping(value = "/api/v1/meals/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@Operation(summary = "上传餐盘并分析", description = "优先走 AI 图像识别；若子服务不可用，则切换 SAFE_FALLBACK 并仅返回保守提示。")
 	public ApiResponse<AppContracts.MealAnalyzeResponse> analyzeMeal(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@RequestPart("file") MultipartFile file,
@@ -278,6 +283,7 @@ public class CoreController {
 	}
 
 	@GetMapping("/api/v1/analysis/uric-acid-causes")
+	@Operation(summary = "分析近期尿酸升高诱因", description = "综合最近尿酸、饮食、补水、发作与化验单信息，输出结构化原因分析。")
 	public ApiResponse<AppContracts.UricAcidCauseAnalysisResponse> getLatestUricAcidCauseAnalysis(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@RequestParam(defaultValue = "7")
@@ -296,6 +302,8 @@ public class CoreController {
 	}
 
 	@PostMapping(value = "/api/v1/lab-reports/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@Tag(name = "饮食与化验")
+	@Operation(summary = "上传化验单并解析", description = "正常情况下走 OCR 提取；若 AI 子服务不可用，则直接进入人工确认流程，不生成估算化验值。")
 	public ApiResponse<AppContracts.LabReportAnalyzeResponse> analyzeLabReport(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@RequestPart("file") MultipartFile file,
@@ -312,6 +320,8 @@ public class CoreController {
 	}
 
 	@GetMapping("/api/v1/lab-reports/{reportId}/review")
+	@Tag(name = "饮食与化验")
+	@Operation(summary = "查看化验单复盘", description = "返回目标值判断、前后对比、可信度边界与人工确认任务。")
 	public ApiResponse<AppContracts.LabReportReviewResponse> getLabReportReview(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@PathVariable String reportId
@@ -320,6 +330,8 @@ public class CoreController {
 	}
 
 	@PutMapping("/api/v1/lab-reports/{reportId}/manual-confirmation")
+	@Tag(name = "饮食与化验")
+	@Operation(summary = "人工确认化验单关键指标", description = "用于在 OCR 不稳定或 AI 服务不可用时，手动补录多个关键指标并解锁正式复盘。")
 	public ApiResponse<AppContracts.LabReportReviewResponse> confirmLabReportManually(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@PathVariable String reportId,
@@ -329,6 +341,8 @@ public class CoreController {
 	}
 
 	@PostMapping("/api/v1/knowledge/ask")
+	@Tag(name = "饮食与化验")
+	@Operation(summary = "健康问答", description = "优先调用 AI 问答；依赖不可用时返回本地兜底建议，并保留安全边界说明。")
 	public ApiResponse<AppContracts.KnowledgeAnswerResponse> askKnowledge(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@Valid @RequestBody AppContracts.AskKnowledgeRequest request

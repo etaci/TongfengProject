@@ -40,6 +40,7 @@ com\tongfeng\backend\app\AppContracts$FeatureStatusResponse.class
 com\tongfeng\backend\app\LocalFileStorageService$StoredPhysicalFile.class
 com\tongfeng\backend\app\AppContracts$FamilyInviteResponse.class
 com\tongfeng\backend\app\AppContracts$MedicationItem.class
+com\tongfeng\backend\app\AppContracts$ErrorCodeCatalogResponse.class
 com\tongfeng\backend\app\UricAcidAnalysisService$1.class
 com\tongfeng\backend\app\AiServiceClient$LabAiResult.class
 com\tongfeng\backend\app\AiServiceClient$MealAiResult.class
@@ -81,6 +82,7 @@ com\tongfeng\backend\app\AppContracts$HealthRecordDeleteResponse.class
 com\tongfeng\backend\app\persistence\repo\HealthRecordAuditRepository.class
 com\tongfeng\backend\app\SessionCacheService.class
 com\tongfeng\backend\app\persistence\repo\FamilyBindingRepository.class
+com\tongfeng\backend\app\RequestTraceContext.class
 com\tongfeng\backend\app\AppContracts$AuthSessionInfoResponse.class
 com\tongfeng\backend\app\HealthRuleEngineService.class
 com\tongfeng\backend\app\AppContracts$AppCapabilitiesResponse.class
@@ -102,6 +104,7 @@ com\tongfeng\backend\app\HealthAssistantService$2.class
 com\tongfeng\backend\app\AppContracts$ProactiveCareBriefResponse.class
 com\tongfeng\backend\app\AppContracts$MealAnalyzeResponse.class
 com\tongfeng\backend\app\AppContracts$AccountVerificationStatusResponse.class
+com\tongfeng\backend\app\TraceIdFilter.class
 com\tongfeng\backend\app\AppContracts$AuthLogoutResponse.class
 com\tongfeng\backend\app\AppContracts$TimelineResponse.class
 com\tongfeng\backend\app\AppContracts$LabReportManualConfirmRequest.class
@@ -113,7 +116,9 @@ com\tongfeng\backend\app\AppContracts$LoginRequest.class
 com\tongfeng\backend\app\ProactiveCareService.class
 com\tongfeng\backend\app\UserSession.class
 com\tongfeng\backend\app\AppContracts$FileUploadResponse.class
+com\tongfeng\backend\app\OpenApiConfig.class
 com\tongfeng\backend\app\persistence\repo\UserAccountRepository.class
+com\tongfeng\backend\app\ApiDocsController.class
 com\tongfeng\backend\app\AppContracts$DailyHealthSummaryResponse.class
 com\tongfeng\backend\app\persistence\entity\MvpUsageEventEntity.class
 com\tongfeng\backend\app\persistence\repo\WeightRecordRepository.class
@@ -125,7 +130,9 @@ com\tongfeng\backend\app\AppProperties.class
 com\tongfeng\backend\app\persistence\entity\MedicationCheckinEntity.class
 com\tongfeng\backend\app\persistence\repo\PrivacyConsentRecordRepository.class
 com\tongfeng\backend\app\AppContracts$MedicationPlanRequest.class
+com\tongfeng\backend\app\AppContracts$ErrorCodeItemResponse.class
 com\tongfeng\backend\app\LocalFileStorageService.class
+com\tongfeng\backend\app\AppErrorCode.class
 com\tongfeng\backend\app\PasswordHashService$HashedPassword.class
 com\tongfeng\backend\app\persistence\repo\WeatherDailySnapshotRepository.class
 com\tongfeng\backend\app\persistence\repo\MedicationPlanRepository.class
@@ -136,6 +143,7 @@ com\tongfeng\backend\app\persistence\entity\ReminderEventEntity.class
 com\tongfeng\backend\app\persistence\repo\DailyHealthSummaryRepository.class
 com\tongfeng\backend\app\AppContracts$HealthRecordRestoreRequest.class
 com\tongfeng\backend\app\AppContracts$AskKnowledgeRequest.class
+com\tongfeng\backend\app\SystemMetaController.class
 com\tongfeng\backend\app\persistence\entity\UricAcidRecordEntity.class
 com\tongfeng\backend\app\WebConfig.class
 com\tongfeng\backend\app\AppContracts$LabManualIndicatorRequest.class

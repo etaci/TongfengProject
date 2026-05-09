@@ -1,5 +1,8 @@
 package com.tongfeng.backend.app;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -13,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Tag(name = "认证与隐私")
 public class AuthController {
 
 	private final HealthAssistantService healthAssistantService;
@@ -22,6 +26,8 @@ public class AuthController {
 	}
 
 	@PostMapping("/api/v1/auth/mock-login")
+	@Operation(summary = "开发环境模拟登录", description = "仅用于开发联调与测试环境，不应作为真实患者入口。")
+	@SecurityRequirements
 	public ApiResponse<AppContracts.AuthTokenResponse> mockLogin(
 			@Valid @RequestBody AppContracts.MockLoginRequest request,
 			HttpServletRequest servletRequest
@@ -30,6 +36,8 @@ public class AuthController {
 	}
 
 	@PostMapping("/api/v1/auth/register")
+	@Operation(summary = "注册正式账号", description = "注册邮箱或手机号账号，并同步写入当前隐私授权版本。")
+	@SecurityRequirements
 	public ApiResponse<AppContracts.AuthTokenResponse> register(
 			@Valid @RequestBody AppContracts.RegisterRequest request,
 			HttpServletRequest servletRequest
@@ -38,6 +46,8 @@ public class AuthController {
 	}
 
 	@PostMapping("/api/v1/auth/login")
+	@Operation(summary = "账号密码登录", description = "支持邮箱或手机号登录，会返回当前会话、风险等级与安全提示。")
+	@SecurityRequirements
 	public ApiResponse<AppContracts.AuthTokenResponse> login(
 			@Valid @RequestBody AppContracts.LoginRequest request,
 			HttpServletRequest servletRequest
@@ -46,6 +56,8 @@ public class AuthController {
 	}
 
 	@PostMapping("/api/v1/auth/verification-codes/request")
+	@Operation(summary = "申请验证码", description = "当前支持密码重置与账号验证场景，接口已接入冷却与窗口限流。")
+	@SecurityRequirements
 	public ApiResponse<AppContracts.VerificationChallengeResponse> requestVerificationCode(
 			@Valid @RequestBody AppContracts.VerificationCodeRequest request
 	) {
@@ -53,6 +65,8 @@ public class AuthController {
 	}
 
 	@PostMapping("/api/v1/auth/password-reset/confirm")
+	@Operation(summary = "确认密码重置", description = "使用验证码完成密码重置，成功后旧密码失效。")
+	@SecurityRequirements
 	public ApiResponse<AppContracts.AuthLogoutResponse> confirmPasswordReset(
 			@Valid @RequestBody AppContracts.PasswordResetConfirmRequest request
 	) {
@@ -75,6 +89,7 @@ public class AuthController {
 	}
 
 	@GetMapping("/api/v1/auth/sessions")
+	@Operation(summary = "查询活动会话", description = "返回当前账号所有有效会话，供设备管理与异常排查使用。")
 	public ApiResponse<List<AppContracts.AuthActiveSessionResponse>> getActiveSessions(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@RequestAttribute(AuthInterceptor.CURRENT_TOKEN) String token
@@ -83,6 +98,7 @@ public class AuthController {
 	}
 
 	@PutMapping("/api/v1/auth/password")
+	@Operation(summary = "修改密码", description = "修改密码后可选择注销其他设备会话。")
 	public ApiResponse<AppContracts.PasswordChangeResponse> changePassword(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@RequestAttribute(AuthInterceptor.CURRENT_TOKEN) String token,

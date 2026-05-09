@@ -1,6 +1,8 @@
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AiServiceClient.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\ApiDocsController.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\ApiResponse.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AppContracts.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AppErrorCode.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AppProperties.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AuthController.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AuthInterceptor.java
@@ -17,6 +19,7 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\IdGenerat
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\JsonCodec.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\LocalFileStorageService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\MvpMetricsService.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\OpenApiConfig.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\PasswordHashService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthIdentityEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthSessionEntity.java
@@ -68,7 +71,10 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persisten
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\WeightRecordRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\ProactiveCareService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\RecordCenterService.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\RequestTraceContext.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\SessionCacheService.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\SystemMetaController.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\TraceIdFilter.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\UricAcidAnalysisService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\UserSession.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\VerificationDeliveryService.java

@@ -3,6 +3,8 @@ package com.tongfeng.backend.app;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDate;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
@@ -13,6 +15,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 @org.springframework.stereotype.Component
 public class AiServiceClient {
+
+	public static final String MEAL_ANALYSIS_MODE_AI_VISION = "AI_VISION";
+	public static final String MEAL_ANALYSIS_MODE_SAFE_FALLBACK = "SAFE_FALLBACK";
+	public static final String LAB_ANALYSIS_MODE_AI_OCR = "AI_OCR";
+	public static final String LAB_ANALYSIS_MODE_SAFE_FALLBACK = "SAFE_FALLBACK";
+
+	private static final Logger log = LoggerFactory.getLogger(AiServiceClient.class);
 
 	private final RestClient restClient;
 
@@ -29,14 +38,28 @@ public class AiServiceClient {
 		body.add("mealType", mealType);
 		body.add("note", note == null ? "" : note);
 		try {
-			return restClient.post()
+			MealAiResult result = restClient.post()
 					.uri("/api/v1/vision/meal-analyze")
 					.contentType(MediaType.MULTIPART_FORM_DATA)
 					.body(body)
 					.retrieve()
 					.body(MealAiResult.class);
+			if (result == null) {
+				log.warn("Meal AI returned empty body, switch to SAFE_FALLBACK");
+				return buildFallbackMealResult();
+			}
+			return new MealAiResult(
+					result.overallRiskLevel(),
+					result.purineEstimateMg(),
+					result.items(),
+					result.suggestions(),
+					result.summary(),
+					defaultMode(result.analysisMode(), MEAL_ANALYSIS_MODE_AI_VISION),
+					safeList(result.trustNotes())
+			);
 		} catch (RestClientException ex) {
-			throw new BusinessException("AI_MEAL_ERROR", "餐盘识别服务不可用: " + ex.getMessage());
+			log.warn("Meal AI unavailable, switch to SAFE_FALLBACK: {}", ex.getMessage());
+			return buildFallbackMealResult();
 		}
 	}
 
@@ -46,14 +69,27 @@ public class AiServiceClient {
 		body.add("userId", userId);
 		body.add("reportDate", reportDate == null ? "" : reportDate.toString());
 		try {
-			return restClient.post()
+			LabAiResult result = restClient.post()
 					.uri("/api/v1/ocr/lab-report-analyze")
 					.contentType(MediaType.MULTIPART_FORM_DATA)
 					.body(body)
 					.retrieve()
 					.body(LabAiResult.class);
+			if (result == null) {
+				log.warn("Lab AI returned empty body, switch to SAFE_FALLBACK");
+				return buildFallbackLabResult();
+			}
+			return new LabAiResult(
+					result.indicators(),
+					result.overallRiskLevel(),
+					result.suggestions(),
+					result.summary(),
+					defaultMode(result.analysisMode(), LAB_ANALYSIS_MODE_AI_OCR),
+					safeList(result.trustNotes())
+			);
 		} catch (RestClientException ex) {
-			throw new BusinessException("AI_LAB_ERROR", "化验单解析服务不可用: " + ex.getMessage());
+			log.warn("Lab AI unavailable, switch to SAFE_FALLBACK: {}", ex.getMessage());
+			return buildFallbackLabResult();
 		}
 	}
 
@@ -87,6 +123,51 @@ public class AiServiceClient {
 		);
 	}
 
+	private MealAiResult buildFallbackMealResult() {
+		return new MealAiResult(
+				AppContracts.RiskLevel.YELLOW,
+				null,
+				List.of(),
+				List.of(
+						"AI 图像识别当前不可用，本次不会输出正式食材识别结果。",
+						"请手动补充是否包含酒精、海鲜、动物内脏、浓肉汤等高风险食材。",
+						"如处于发作期，请先按低嘌呤饮食、规律补水和避免饮酒处理。"
+				),
+				"当前已切换到安全兜底模式：本次仅保留上传记录，不输出正式食材识别结论或嘌呤估算。",
+				MEAL_ANALYSIS_MODE_SAFE_FALLBACK,
+				List.of(
+						"本次未调用到 AI 图像识别服务，系统没有对食材做正式识别。",
+						"请结合原图和实际进食内容，手动判断是否存在高风险饮食暴露。"
+				)
+		);
+	}
+
+	private LabAiResult buildFallbackLabResult() {
+		return new LabAiResult(
+				List.of(),
+				AppContracts.RiskLevel.YELLOW,
+				List.of(
+						"AI 子服务当前不可用，本次不会估算或补造化验指标。",
+						"请重新上传更清晰的报告，或直接手动补录多个关键指标后再继续复盘。",
+						"在人工确认前，不要把当前结果当作正式化验结论或趋势依据。"
+				),
+				"当前已切换到安全兜底模式：系统保留原始报告文件，但不会输出正式 OCR 结论。",
+				LAB_ANALYSIS_MODE_SAFE_FALLBACK,
+				List.of(
+						"本次未调用到 AI OCR 服务，系统没有生成任何估算化验值。",
+						"当前化验单将直接进入人工确认流程，完成补录后再生成正式复盘。"
+				)
+		);
+	}
+
+	private String defaultMode(String mode, String fallback) {
+		return mode == null || mode.isBlank() ? fallback : mode;
+	}
+
+	private <T> List<T> safeList(List<T> items) {
+		return items == null ? List.of() : items;
+	}
+
 	private byte[] readBytes(MultipartFile file) {
 		try {
 			return file.getBytes();
@@ -104,7 +185,9 @@ public class AiServiceClient {
 			Integer purineEstimateMg,
 			List<AppContracts.MealItem> items,
 			List<String> suggestions,
-			String summary
+			String summary,
+			String analysisMode,
+			List<String> trustNotes
 	) {
 	}
 
@@ -113,7 +196,9 @@ public class AiServiceClient {
 			List<AppContracts.LabIndicator> indicators,
 			AppContracts.RiskLevel overallRiskLevel,
 			List<String> suggestions,
-			String summary
+			String summary,
+			String analysisMode,
+			List<String> trustNotes
 	) {
 	}
 
