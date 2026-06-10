@@ -495,6 +495,21 @@ class BackendApiFlowTests {
 				.andExpect(jsonPath("$.data.patientNickname").value("demo-user"))
 				.andExpect(jsonPath("$.data.weeklyReport.plannedDoseCount").value(7));
 
+		mockMvc.perform(get("/api/v1/access/policy")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.policyVersion").value("SESSION_TOKEN_RBAC_V1"))
+				.andExpect(jsonPath("$.data.tokenStrategy").value("Bearer Session Token + business RBAC"))
+				.andExpect(jsonPath("$.data.roles[*].roleKey", hasItem("PATIENT")))
+				.andExpect(jsonPath("$.data.roles[*].roleKey", hasItem("CAREGIVER_TASK")));
+
+		mockMvc.perform(get("/api/v1/access/audits")
+						.header("Authorization", "Bearer " + familyToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[*].resourceType", hasItem("FAMILY_PATIENT_SUMMARY")))
+				.andExpect(jsonPath("$.data[*].resourceType", hasItem("FAMILY_MEDICATION_WEEKLY_REPORT")))
+				.andExpect(jsonPath("$.data[0].actorRole").value("CAREGIVER_TASK"));
+
 		mockMvc.perform(put("/api/v1/family/members/{bindingCode}/permissions", bindingCode)
 						.header("Authorization", "Bearer " + token)
 						.contentType(MediaType.APPLICATION_JSON)
@@ -509,6 +524,13 @@ class BackendApiFlowTests {
 				.andExpect(jsonPath("$.data.caregiverPermission").value("READ_ONLY"))
 				.andExpect(jsonPath("$.data.weeklyReportEnabled").value(false))
 				.andExpect(jsonPath("$.data.notifyOnHighRisk").value(false));
+
+		mockMvc.perform(get("/api/v1/access/patient-audits")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[*].resourceType", hasItem("FAMILY_PERMISSION")))
+				.andExpect(jsonPath("$.data[*].resourceType", hasItem("FAMILY_PATIENT_SUMMARY")))
+				.andExpect(jsonPath("$.data[0].decision").value("ALLOWED"));
 
 		mockMvc.perform(get("/api/v1/family/alerts")
 						.header("Authorization", "Bearer " + familyToken))

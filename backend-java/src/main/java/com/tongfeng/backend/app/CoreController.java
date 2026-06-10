@@ -445,11 +445,12 @@ public class CoreController {
 	@PutMapping("/api/v1/family/members/{bindingCode}/permissions")
 	public ApiResponse<AppContracts.FamilyBindingMemberResponse> updateFamilyBindingPermissions(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestAttribute(AuthInterceptor.CURRENT_TOKEN) String token,
 			@PathVariable String bindingCode,
 			@Valid @RequestBody AppContracts.FamilyBindingPermissionUpdateRequest request
 	) {
 		featureAccessService.ensureFamilyEnabled();
-		return ApiResponse.success(healthAssistantService.updateFamilyBindingPermissions(userId, bindingCode, request));
+		return ApiResponse.success(healthAssistantService.updateFamilyBindingPermissions(userId, token, bindingCode, request));
 	}
 
 	@GetMapping("/api/v1/family/alerts")
@@ -491,15 +492,17 @@ public class CoreController {
 	@GetMapping("/api/v1/family/patients/{patientUserId}/summary")
 	public ApiResponse<AppContracts.FamilyPatientSummaryResponse> getFamilyPatientSummary(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestAttribute(AuthInterceptor.CURRENT_TOKEN) String token,
 			@PathVariable String patientUserId
 	) {
 		featureAccessService.ensureFamilyEnabled();
-		return ApiResponse.success(healthAssistantService.getFamilyPatientSummary(userId, patientUserId));
+		return ApiResponse.success(healthAssistantService.getFamilyPatientSummary(userId, token, patientUserId));
 	}
 
 	@GetMapping("/api/v1/family/patients/{patientUserId}/weekly-report")
 	public ApiResponse<AppContracts.FamilySharedMedicationWeeklyReportResponse> getFamilySharedMedicationWeeklyReport(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestAttribute(AuthInterceptor.CURRENT_TOKEN) String token,
 			@PathVariable String patientUserId,
 			@RequestParam(defaultValue = "7")
 			@Min(value = 1, message = "days 不能小于1")
@@ -507,7 +510,36 @@ public class CoreController {
 			int days
 	) {
 		featureAccessService.ensureFamilyEnabled();
-		return ApiResponse.success(healthAssistantService.getFamilySharedMedicationWeeklyReport(userId, patientUserId, days));
+		return ApiResponse.success(healthAssistantService.getFamilySharedMedicationWeeklyReport(userId, token, patientUserId, days));
+	}
+
+	@GetMapping("/api/v1/access/policy")
+	public ApiResponse<AppContracts.AccessPolicyResponse> getAccessPolicy(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
+	) {
+		return ApiResponse.success(healthAssistantService.getAccessPolicy(userId));
+	}
+
+	@GetMapping("/api/v1/access/audits")
+	public ApiResponse<List<AppContracts.AccessAuditResponse>> listOwnAccessAudits(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestParam(defaultValue = "20")
+			@Min(value = 1, message = "limit 不能小于1")
+			@Max(value = 100, message = "limit 不能大于100")
+			int limit
+	) {
+		return ApiResponse.success(healthAssistantService.listOwnAccessAudits(userId, limit));
+	}
+
+	@GetMapping("/api/v1/access/patient-audits")
+	public ApiResponse<List<AppContracts.AccessAuditResponse>> listPatientAccessAudits(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestParam(defaultValue = "20")
+			@Min(value = 1, message = "limit 不能小于1")
+			@Max(value = 100, message = "limit 不能大于100")
+			int limit
+	) {
+		return ApiResponse.success(healthAssistantService.listPatientAccessAudits(userId, limit));
 	}
 
 	@GetMapping("/api/v1/medications")

@@ -125,6 +125,7 @@ public class HealthAssistantService {
 	private final RecordCenterService recordCenterService;
 	private final UricAcidAnalysisService uricAcidAnalysisService;
 	private final MvpMetricsService mvpMetricsService;
+	private final AccessControlService accessControlService;
 
 	public HealthAssistantService(
 			UserAccountRepository userAccountRepository,
@@ -156,7 +157,8 @@ public class HealthAssistantService {
 			FamilyCareService familyCareService,
 			RecordCenterService recordCenterService,
 			UricAcidAnalysisService uricAcidAnalysisService,
-			MvpMetricsService mvpMetricsService
+			MvpMetricsService mvpMetricsService,
+			AccessControlService accessControlService
 	) {
 		this.userAccountRepository = userAccountRepository;
 		this.userProfileRepository = userProfileRepository;
@@ -188,6 +190,7 @@ public class HealthAssistantService {
 		this.recordCenterService = recordCenterService;
 		this.uricAcidAnalysisService = uricAcidAnalysisService;
 		this.mvpMetricsService = mvpMetricsService;
+		this.accessControlService = accessControlService;
 	}
 
 	@Transactional
@@ -1508,11 +1511,21 @@ public class HealthAssistantService {
 	@Transactional
 	public AppContracts.FamilyBindingMemberResponse updateFamilyBindingPermissions(
 			String userId,
+			String token,
 			String bindingCode,
 			AppContracts.FamilyBindingPermissionUpdateRequest request
 	) {
 		ensureProfile(userId);
-		return familyCareService.updateBindingPermissions(userId, bindingCode, request);
+		AppContracts.FamilyBindingMemberResponse response = familyCareService.updateBindingPermissions(userId, bindingCode, request);
+		accessControlService.auditPatientAction(
+				userId,
+				sessionCodeOf(userId, token),
+				"FAMILY_PERMISSION",
+				bindingCode,
+				"UPDATE",
+				"患者调整家属权限与共享范围"
+		);
+		return response;
 	}
 
 	public List<AppContracts.FamilyAlertResponse> getFamilyAlerts(String userId) {
@@ -1520,9 +1533,18 @@ public class HealthAssistantService {
 		return familyCareService.getAlerts(userId);
 	}
 
-	public AppContracts.FamilyPatientSummaryResponse getFamilyPatientSummary(String userId, String patientUserId) {
+	public AppContracts.FamilyPatientSummaryResponse getFamilyPatientSummary(String userId, String token, String patientUserId) {
 		ensureProfile(userId);
 		AppContracts.FamilyPatientSummaryResponse response = familyCareService.getPatientSummary(userId, patientUserId);
+		accessControlService.auditCaregiverAction(
+				userId,
+				sessionCodeOf(userId, token),
+				patientUserId,
+				"FAMILY_PATIENT_SUMMARY",
+				patientUserId,
+				"READ",
+				"家属查看患者授权摘要"
+		);
 		mvpMetricsService.recordEvent(
 				userId,
 				MvpMetricsService.EVENT_FAMILY_PATIENT_SUMMARY_VIEWED,
@@ -1539,12 +1561,22 @@ public class HealthAssistantService {
 
 	public AppContracts.FamilySharedMedicationWeeklyReportResponse getFamilySharedMedicationWeeklyReport(
 			String userId,
+			String token,
 			String patientUserId,
 			int days
 	) {
 		ensureProfile(userId);
 		AppContracts.FamilyBindingMemberResponse binding = familyCareService.requireSharedWeeklyReportAccess(userId, patientUserId);
 		AppContracts.MedicationWeeklyReportResponse weeklyReport = getMedicationWeeklyReport(patientUserId, days);
+		accessControlService.auditCaregiverAction(
+				userId,
+				sessionCodeOf(userId, token),
+				patientUserId,
+				"FAMILY_MEDICATION_WEEKLY_REPORT",
+				patientUserId,
+				"READ",
+				"家属查看患者授权用药周报"
+		);
 		return new AppContracts.FamilySharedMedicationWeeklyReportResponse(
 				binding.patientUserId(),
 				binding.patientNickname(),
@@ -2820,6 +2852,10 @@ public class HealthAssistantService {
 		return session;
 	}
 
+	private String sessionCodeOf(String userId, String token) {
+		return requireOwnedSession(userId, token).sessionCode();
+	}
+
 	private AppContracts.AuthActiveSessionResponse toActiveSessionResponse(AuthSessionEntity entity, boolean currentSession) {
 		return new AppContracts.AuthActiveSessionResponse(
 				entity.getSessionCode(),
@@ -3003,6 +3039,21 @@ public class HealthAssistantService {
 				record.getSummaryText(),
 				resolveLabAnalysisMode(record, indicators)
 		);
+	}
+
+	public AppContracts.AccessPolicyResponse getAccessPolicy(String userId) {
+		ensureProfile(userId);
+		return accessControlService.getPolicy(userId);
+	}
+
+	public List<AppContracts.AccessAuditResponse> listOwnAccessAudits(String userId, int limit) {
+		ensureProfile(userId);
+		return accessControlService.listOwnAccessAudits(userId, limit);
+	}
+
+	public List<AppContracts.AccessAuditResponse> listPatientAccessAudits(String userId, int limit) {
+		ensureProfile(userId);
+		return accessControlService.listPatientAccessAudits(userId, limit);
 	}
 
 	private AppContracts.LabReportReviewComparisonResponse toLabComparison(

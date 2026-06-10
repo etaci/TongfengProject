@@ -1033,6 +1033,54 @@ public final class AppContracts {
 	) {
 	}
 
+	public record AccessRoleResponse(
+			String roleKey,
+			String displayName,
+			List<String> capabilities
+	) {
+	}
+
+	public record AccessRuleResponse(
+			String roleKey,
+			String resourceType,
+			String actionType,
+			String condition
+	) {
+	}
+
+	public record AccessBoundaryResponse(
+			String boundaryName,
+			String description
+	) {
+	}
+
+	public record AccessPolicyResponse(
+			String policyVersion,
+			String tokenStrategy,
+			String tokenStrategyNote,
+			List<AccessRoleResponse> roles,
+			List<AccessRuleResponse> rules,
+			List<AccessBoundaryResponse> boundaries,
+			Instant generatedAt
+	) {
+	}
+
+	public record AccessAuditResponse(
+			String auditCode,
+			String actorUserId,
+			String actorRole,
+			String patientUserId,
+			String resourceType,
+			String resourceId,
+			String actionType,
+			String decision,
+			String bindingCode,
+			String sessionCode,
+			String reason,
+			Instant operatedAt
+	) {
+	}
+
 	public record MedicationItem(
 			@NotBlank(message = "药物名称不能为空")
 			String name,

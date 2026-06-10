@@ -11,8 +11,10 @@ com\tongfeng\backend\app\AppContracts$UserProfileRequest.class
 com\tongfeng\backend\app\AppContracts$HealthRecordCenterItemResponse.class
 com\tongfeng\backend\app\AuthRequestContext.class
 com\tongfeng\backend\app\AppContracts$TodayActionPlanResponse.class
+com\tongfeng\backend\app\persistence\repo\AccessAuditRepository.class
 com\tongfeng\backend\app\RecordCenterService$1.class
 com\tongfeng\backend\app\persistence\entity\HydrationRecordEntity.class
+com\tongfeng\backend\app\AppContracts$AccessAuditResponse.class
 com\tongfeng\backend\app\AppContracts$FlareRecordResponse.class
 com\tongfeng\backend\app\AppContracts$RecordSimpleResponse.class
 com\tongfeng\backend\app\AppContracts$FamilyMembersResponse.class
@@ -79,6 +81,7 @@ com\tongfeng\backend\app\persistence\repo\LabReportRecordRepository.class
 com\tongfeng\backend\app\HealthAssistantService.class
 com\tongfeng\backend\app\AppContracts$LabReportReviewComparisonResponse.class
 com\tongfeng\backend\app\AppContracts$HealthRecordDeleteResponse.class
+com\tongfeng\backend\app\persistence\entity\AccessAuditEntity.class
 com\tongfeng\backend\app\persistence\repo\HealthRecordAuditRepository.class
 com\tongfeng\backend\app\SessionCacheService.class
 com\tongfeng\backend\app\persistence\repo\FamilyBindingRepository.class
@@ -112,6 +115,7 @@ com\tongfeng\backend\BackendJavaApplication.class
 com\tongfeng\backend\app\HealthAssistantService$1.class
 com\tongfeng\backend\app\AppContracts$HealthRecordDetailResponse.class
 com\tongfeng\backend\app\HealthAssistantService$3.class
+com\tongfeng\backend\app\AppContracts$AccessBoundaryResponse.class
 com\tongfeng\backend\app\AppContracts$LoginRequest.class
 com\tongfeng\backend\app\ProactiveCareService.class
 com\tongfeng\backend\app\UserSession.class
@@ -155,6 +159,7 @@ com\tongfeng\backend\app\AppContracts$WeightCreateRequest.class
 com\tongfeng\backend\app\UricAcidAnalysisService.class
 com\tongfeng\backend\app\persistence\repo\FamilyInviteRepository.class
 com\tongfeng\backend\app\AppContracts$ChangePasswordRequest.class
+com\tongfeng\backend\app\AccessControlService.class
 com\tongfeng\backend\app\HealthAssistantService$4.class
 com\tongfeng\backend\app\AppContracts$LabReportReviewResponse.class
 com\tongfeng\backend\app\WeatherGatewayService$ForecastResponse.class
@@ -179,6 +184,7 @@ com\tongfeng\backend\app\WeatherGatewayService$WeatherObservation.class
 com\tongfeng\backend\app\persistence\repo\FamilyTaskRepository.class
 com\tongfeng\backend\app\AppContracts$FlareCreateRequest.class
 com\tongfeng\backend\app\AppContracts$UserProfileResponse.class
+com\tongfeng\backend\app\AppContracts$AccessRuleResponse.class
 com\tongfeng\backend\app\AppContracts$PrivacyConsentResponse.class
 com\tongfeng\backend\app\AppContracts$HealthRecordAuditResponse.class
 com\tongfeng\backend\app\AppContracts$UricAcidCauseAnalysisResponse.class
@@ -193,6 +199,7 @@ com\tongfeng\backend\app\persistence\entity\FlareRecordEntity.class
 com\tongfeng\backend\app\AiServiceClient$NamedByteArrayResource.class
 com\tongfeng\backend\app\AppContracts$AuthActiveSessionResponse.class
 com\tongfeng\backend\app\ApiResponse.class
+com\tongfeng\backend\app\AppContracts$AccessRoleResponse.class
 com\tongfeng\backend\app\AppContracts$MvpMetricBreakdownItemResponse.class
 com\tongfeng\backend\app\HealthAssistantService$DailyMedicationStats.class
 com\tongfeng\backend\app\VerificationDeliveryService.class
@@ -207,6 +214,7 @@ com\tongfeng\backend\app\MvpMetricsService.class
 com\tongfeng\backend\app\AppContracts$RiskLevel.class
 com\tongfeng\backend\app\persistence\repo\HydrationRecordRepository.class
 com\tongfeng\backend\app\AppContracts$TimelineEvent.class
+com\tongfeng\backend\app\AppContracts$AccessPolicyResponse.class
 com\tongfeng\backend\app\AppContracts$FlareReviewReportResponse.class
 com\tongfeng\backend\app\AuthController.class
 com\tongfeng\backend\app\AppContracts$LabReportAnalyzeResponse.class

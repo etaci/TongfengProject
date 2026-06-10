@@ -1,3 +1,4 @@
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AccessControlService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AiServiceClient.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\ApiDocsController.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\ApiResponse.java
@@ -21,6 +22,7 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\LocalFile
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\MvpMetricsService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\OpenApiConfig.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\PasswordHashService.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AccessAuditEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthIdentityEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthSessionEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthVerificationChallengeEntity.java
@@ -45,6 +47,7 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persisten
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\UserProfileEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\WeatherDailySnapshotEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\WeightRecordEntity.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AccessAuditRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AuthIdentityRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AuthSessionRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AuthVerificationChallengeRepository.java
