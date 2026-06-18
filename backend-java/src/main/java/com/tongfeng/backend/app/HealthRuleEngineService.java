@@ -32,6 +32,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -57,6 +60,7 @@ public class HealthRuleEngineService {
 	private final WeatherDailySnapshotRepository weatherDailySnapshotRepository;
 	private final IdGenerator idGenerator;
 	private final JsonCodec jsonCodec;
+	private final ConcurrentMap<String, Object> dailySummaryLocks = new ConcurrentHashMap<>();
 
 	public HealthRuleEngineService(
 			ReminderEventRepository reminderEventRepository,
@@ -128,8 +132,19 @@ public class HealthRuleEngineService {
 				.toList();
 	}
 
-	@Transactional
 	public DailyHealthSummaryEntity refreshDailySummary(String userId, LocalDate summaryDate) {
+		String lockKey = userId + ":" + summaryDate;
+		Object lock = dailySummaryLocks.computeIfAbsent(lockKey, ignored -> new Object());
+		synchronized (lock) {
+			try {
+				return refreshDailySummaryLocked(userId, summaryDate);
+			} finally {
+				dailySummaryLocks.remove(lockKey, lock);
+			}
+		}
+	}
+
+	private DailyHealthSummaryEntity refreshDailySummaryLocked(String userId, LocalDate summaryDate) {
 		Instant now = Instant.now();
 		DailyHealthSummaryEntity entity = dailyHealthSummaryRepository.findByUserCodeAndSummaryDate(userId, summaryDate)
 				.orElseGet(() -> {
@@ -182,16 +197,62 @@ public class HealthRuleEngineService {
 			riskLevel = maxRisk(riskLevel, AppContracts.RiskLevel.RED);
 		}
 
-		entity.setLatestUricAcidValue(latestUa.map(UricAcidRecordEntity::getUaValue).orElse(null));
-		entity.setLatestUricAcidUnit(latestUa.map(UricAcidRecordEntity::getUaUnit).orElse(null));
-		entity.setLatestWeightValue(latestWeight.map(WeightRecordEntity::getWeightValue).orElse(null));
+		populateDailySummary(
+				entity,
+				summaryDate,
+				now,
+				latestUa.orElse(null),
+				latestWeight.orElse(null),
+				totalWater,
+				highRiskMealCount,
+				flareCount,
+				riskLevel
+		);
+		return saveDailySummaryWithRetry(entity, userId, summaryDate, now, latestUa.orElse(null), latestWeight.orElse(null), totalWater, highRiskMealCount, flareCount, riskLevel);
+	}
+
+	private void populateDailySummary(
+			DailyHealthSummaryEntity entity,
+			LocalDate summaryDate,
+			Instant now,
+			UricAcidRecordEntity latestUa,
+			WeightRecordEntity latestWeight,
+			int totalWater,
+			int highRiskMealCount,
+			int flareCount,
+			AppContracts.RiskLevel riskLevel
+	) {
+		entity.setLatestUricAcidValue(latestUa == null ? null : latestUa.getUaValue());
+		entity.setLatestUricAcidUnit(latestUa == null ? null : latestUa.getUaUnit());
+		entity.setLatestWeightValue(latestWeight == null ? null : latestWeight.getWeightValue());
 		entity.setTotalWaterIntakeMl(totalWater);
 		entity.setHighRiskMealCount(highRiskMealCount);
 		entity.setFlareCount(flareCount);
 		entity.setOverallRiskLevel(riskLevel.name());
-		entity.setSummaryText(buildDailySummaryText(summaryDate, latestUa.orElse(null), totalWater, highRiskMealCount, flareCount, riskLevel));
+		entity.setSummaryText(buildDailySummaryText(summaryDate, latestUa, totalWater, highRiskMealCount, flareCount, riskLevel));
 		entity.setUpdatedAt(now);
-		return dailyHealthSummaryRepository.save(entity);
+	}
+
+	private DailyHealthSummaryEntity saveDailySummaryWithRetry(
+			DailyHealthSummaryEntity entity,
+			String userId,
+			LocalDate summaryDate,
+			Instant now,
+			UricAcidRecordEntity latestUa,
+			WeightRecordEntity latestWeight,
+			int totalWater,
+			int highRiskMealCount,
+			int flareCount,
+			AppContracts.RiskLevel riskLevel
+	) {
+		try {
+			return dailyHealthSummaryRepository.saveAndFlush(entity);
+		} catch (DataIntegrityViolationException ex) {
+			DailyHealthSummaryEntity existing = dailyHealthSummaryRepository.findByUserCodeAndSummaryDate(userId, summaryDate)
+					.orElseThrow(() -> ex);
+			populateDailySummary(existing, summaryDate, now, latestUa, latestWeight, totalWater, highRiskMealCount, flareCount, riskLevel);
+			return dailyHealthSummaryRepository.saveAndFlush(existing);
+		}
 	}
 
 	public List<AppContracts.DailyHealthSummaryResponse> getRecentSummaries(String userId, int days) {

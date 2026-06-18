@@ -1,0 +1,128 @@
+{
+  "actions": [
+    {
+      "name": "??????",
+      "status": "pass",
+      "detail": "已进入开发体验环境，欢迎你，??????A。"
+    },
+    {
+      "name": "??/overview",
+      "status": "pass",
+      "detail": "http://127.0.0.1:5173/overview"
+    },
+    {
+      "name": "??/records",
+      "status": "pass",
+      "detail": "http://127.0.0.1:5173/records"
+    },
+    {
+      "name": "??/analysis",
+      "status": "pass",
+      "detail": "http://127.0.0.1:5173/analysis"
+    },
+    {
+      "name": "??/proactive",
+      "status": "pass",
+      "detail": "http://127.0.0.1:5173/proactive"
+    },
+    {
+      "name": "??/assistant",
+      "status": "fail",
+      "detail": "http://127.0.0.1:5173/family"
+    },
+    {
+      "name": "??????",
+      "status": "fail",
+      "detail": "Cannot read properties of null (reading 'reset')"
+    },
+    {
+      "name": "??????",
+      "status": "fail",
+      "detail": "Cannot read properties of null (reading 'reset')"
+    },
+    {
+      "name": "??????",
+      "status": "fail",
+      "detail": "Cannot read properties of null (reading 'reset')"
+    },
+    {
+      "name": "??????",
+      "status": "fail",
+      "detail": "Cannot read properties of null (reading 'reset')"
+    },
+    {
+      "name": "????????????",
+      "status": "fail",
+      "detail": "count=0"
+    },
+    {
+      "name": "??????",
+      "status": "fail",
+      "detail": "Cannot read properties of null (reading 'reset')"
+    },
+    {
+      "name": "????????",
+      "status": "fail",
+      "detail": "页面已准备就绪，登录后即可开始记录与分析。"
+    },
+    {
+      "name": "??????",
+      "status": "pass",
+      "detail": "知识问答结果已返回。"
+    },
+    {
+      "name": "???????",
+      "status": "fail",
+      "detail": "submitCount=10; banner=请输入邀请码后再接受。"
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "requestFailures": [
+    {
+      "url": "http://127.0.0.1:5173/api/v1/proactive-care/settings",
+      "error": "net::ERR_ABORTED"
+    }
+  ],
+  "notes": [
+    {
+      "name": "assistant-file-input-count",
+      "value": 2
+    }
+  ]
+}

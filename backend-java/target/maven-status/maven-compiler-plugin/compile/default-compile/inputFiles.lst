@@ -84,3 +84,4 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\Verificat
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\WeatherGatewayService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\WebConfig.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\BackendJavaApplication.java
+H:\ProjectTongfeng\backend-java\src\main\java\db\migration\V3__fix_text_columns.java

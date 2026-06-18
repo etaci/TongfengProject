@@ -80,6 +80,7 @@ com\tongfeng\backend\app\persistence\entity\UserProfileEntity.class
 com\tongfeng\backend\app\persistence\repo\LabReportRecordRepository.class
 com\tongfeng\backend\app\HealthAssistantService.class
 com\tongfeng\backend\app\AppContracts$LabReportReviewComparisonResponse.class
+db\migration\V3__fix_text_columns.class
 com\tongfeng\backend\app\AppContracts$HealthRecordDeleteResponse.class
 com\tongfeng\backend\app\persistence\entity\AccessAuditEntity.class
 com\tongfeng\backend\app\persistence\repo\HealthRecordAuditRepository.class

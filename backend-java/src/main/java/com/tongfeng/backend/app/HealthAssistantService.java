@@ -57,6 +57,7 @@ import java.util.regex.Pattern;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -804,6 +805,7 @@ public class HealthAssistantService {
 		return recordCenterService.deleteRecord(userId, type, recordId);
 	}
 
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public AppContracts.DashboardOverviewResponse getOverview(String userId) {
 		List<AppContracts.ReminderResponse> reminders = getReminders(userId);
 		List<AppContracts.DailyHealthSummaryResponse> summaries = getDailySummaries(userId, 1);
@@ -839,6 +841,7 @@ public class HealthAssistantService {
 		);
 	}
 
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public AppContracts.TodayActionPlanResponse getTodayActionPlan(String userId) {
 		ensureProfile(userId);
 		List<AppContracts.ReminderResponse> reminders = getReminders(userId);
@@ -1740,6 +1743,7 @@ public class HealthAssistantService {
 		return toMedicationCheckinResponse(entity);
 	}
 
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public List<AppContracts.DailyHealthSummaryResponse> getDailySummaries(String userId, int days) {
 		List<AppContracts.DailyHealthSummaryResponse> summaries = healthRuleEngineService.getRecentSummaries(userId, days);
 		if (!summaries.isEmpty()) {

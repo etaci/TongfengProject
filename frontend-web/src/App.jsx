@@ -597,16 +597,18 @@ export default function App() {
 
   async function handleRecordSubmit(event, busyKey, path, successMessage, mapper) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     await withErrorHandling(async () => {
       await app.submitSimpleRecord(busyKey, path, buildRecordMapper(formData, mapper), successMessage);
-      event.currentTarget.reset();
+      form.reset();
     });
   }
 
   async function handleMealSubmit(event) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const file = formData.get("file");
 
     if (!(file instanceof File) || !file.size) {
@@ -629,13 +631,14 @@ export default function App() {
 
     await withErrorHandling(async () => {
       await app.submitMealAnalysis(payload);
-      event.currentTarget.reset();
+      form.reset();
     });
   }
 
   async function handleLabSubmit(event) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const file = formData.get("file");
 
     if (!(file instanceof File) || !file.size) {
@@ -652,7 +655,7 @@ export default function App() {
 
     await withErrorHandling(async () => {
       await app.submitLabAnalysis(payload);
-      event.currentTarget.reset();
+      form.reset();
     });
   }
 
@@ -841,7 +844,8 @@ export default function App() {
 
   async function handleFileUpload(event) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const file = formData.get("file");
 
     if (!(file instanceof File) || !file.size) {
@@ -851,7 +855,7 @@ export default function App() {
 
     await withErrorHandling(async () => {
       await app.submitFileUpload(file);
-      event.currentTarget.reset();
+      form.reset();
     });
   }
 

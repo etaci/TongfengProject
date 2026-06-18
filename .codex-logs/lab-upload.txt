@@ -1,0 +1,3 @@
+UA 428 umol/L
+CR 89 umol/L
+CRP 4 mg/L
