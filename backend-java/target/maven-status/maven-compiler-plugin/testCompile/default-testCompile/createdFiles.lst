@@ -1,2 +1,3 @@
 com\tongfeng\backend\BackendJavaApplicationTests.class
+com\tongfeng\backend\MockLoginDisabledTests.class
 com\tongfeng\backend\BackendApiFlowTests.class

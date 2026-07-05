@@ -20,9 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
 	private final HealthAssistantService healthAssistantService;
+	private final AppProperties appProperties;
 
-	public AuthController(HealthAssistantService healthAssistantService) {
+	public AuthController(HealthAssistantService healthAssistantService, AppProperties appProperties) {
 		this.healthAssistantService = healthAssistantService;
+		this.appProperties = appProperties;
 	}
 
 	@PostMapping("/api/v1/auth/mock-login")
@@ -32,6 +34,9 @@ public class AuthController {
 			@Valid @RequestBody AppContracts.MockLoginRequest request,
 			HttpServletRequest servletRequest
 	) {
+		if (!appProperties.isMockLoginEnabled()) {
+			throw new BusinessException(AppErrorCode.FEATURE_DISABLED, "开发用 mock-login 当前环境未开放");
+		}
 		return ApiResponse.success(healthAssistantService.mockLogin(request, buildRequestContext(servletRequest)));
 	}
 

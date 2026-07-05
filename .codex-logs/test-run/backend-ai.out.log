@@ -1,0 +1,11 @@
+INFO:     127.0.0.1:59699 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64301 - "POST /api/v1/knowledge/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61884 - "POST /api/v1/vision/meal-analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54285 - "POST /api/v1/ocr/lab-report-analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56998 - "POST /api/v1/vision/meal-analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56998 - "POST /api/v1/knowledge/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56998 - "POST /api/v1/ocr/lab-report-analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58003 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51477 - "POST /api/v1/knowledge/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64623 - "POST /api/v1/ocr/lab-report-analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64623 - "POST /api/v1/vision/meal-analyze HTTP/1.1" 200 OK

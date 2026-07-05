@@ -22,6 +22,7 @@ public class AppProperties {
 	private int authKnownDeviceDays = 90;
 	private int authLoginFailureThreshold = 5;
 	private int authLoginFailureLockMinutes = 15;
+	private boolean mockLoginEnabled = true;
 	private boolean authEmailEnabled = false;
 	private String authEmailFrom = "no-reply@tongfeng.local";
 	private String authEmailSubjectPrefix = "[痛风主动管理]";
@@ -172,6 +173,14 @@ public class AppProperties {
 
 	public void setAuthLoginFailureLockMinutes(int authLoginFailureLockMinutes) {
 		this.authLoginFailureLockMinutes = authLoginFailureLockMinutes;
+	}
+
+	public boolean isMockLoginEnabled() {
+		return mockLoginEnabled;
+	}
+
+	public void setMockLoginEnabled(boolean mockLoginEnabled) {
+		this.mockLoginEnabled = mockLoginEnabled;
 	}
 
 	public boolean isAuthEmailEnabled() {

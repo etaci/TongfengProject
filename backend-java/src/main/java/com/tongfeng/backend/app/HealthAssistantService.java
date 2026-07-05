@@ -56,6 +56,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -592,6 +593,12 @@ public class HealthAssistantService {
 	public AppContracts.FileUploadResponse uploadFile(String userId, MultipartFile file) {
 		StoredFileEntity storedFileEntity = persistStoredFile(userId, file);
 		return toFileUploadResponse(storedFileEntity);
+	}
+
+	public List<AppContracts.FileUploadResponse> listOwnedFiles(String userId, int limit) {
+		return storedFileRepository.findByUserCodeOrderByUploadedAtDesc(userId, PageRequest.of(0, limit)).stream()
+				.map(this::toFileUploadResponse)
+				.toList();
 	}
 
 	public StoredFileEntity getOwnedFile(String userId, String fileId) {

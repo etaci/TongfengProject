@@ -30,13 +30,16 @@ import org.springframework.web.multipart.MultipartFile;
 public class CoreController {
 
 	private final HealthAssistantService healthAssistantService;
+	private final LabReportService labReportService;
 	private final FeatureAccessService featureAccessService;
 
 	public CoreController(
 			HealthAssistantService healthAssistantService,
+			LabReportService labReportService,
 			FeatureAccessService featureAccessService
 	) {
 		this.healthAssistantService = healthAssistantService;
+		this.labReportService = labReportService;
 		this.featureAccessService = featureAccessService;
 	}
 
@@ -69,6 +72,17 @@ public class CoreController {
 			@RequestPart("file") MultipartFile file
 	) {
 		return ApiResponse.success(healthAssistantService.uploadFile(userId, file));
+	}
+
+	@GetMapping("/api/v1/files")
+	public ApiResponse<List<AppContracts.FileUploadResponse>> listFiles(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@RequestParam(defaultValue = "20")
+			@Min(value = 1, message = "limit 涓嶈兘灏忎簬1")
+			@Max(value = 100, message = "limit 涓嶈兘澶т簬100")
+			int limit
+	) {
+		return ApiResponse.success(healthAssistantService.listOwnedFiles(userId, limit));
 	}
 
 	@GetMapping("/api/v1/files/{fileId}")
@@ -309,14 +323,14 @@ public class CoreController {
 			@RequestPart("file") MultipartFile file,
 			@RequestParam(required = false) String reportDate
 	) {
-		return ApiResponse.success(healthAssistantService.analyzeLabReport(userId, reportDate, file));
+		return ApiResponse.success(labReportService.analyzeLabReport(userId, reportDate, file));
 	}
 
 	@GetMapping("/api/v1/lab-reports")
 	public ApiResponse<List<AppContracts.LabReportAnalyzeResponse>> listLabReports(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
-		return ApiResponse.success(healthAssistantService.listLabReports(userId));
+		return ApiResponse.success(labReportService.listLabReports(userId));
 	}
 
 	@GetMapping("/api/v1/lab-reports/{reportId}/review")
@@ -326,7 +340,7 @@ public class CoreController {
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
 			@PathVariable String reportId
 	) {
-		return ApiResponse.success(healthAssistantService.getLabReportReview(userId, reportId));
+		return ApiResponse.success(labReportService.getLabReportReview(userId, reportId));
 	}
 
 	@PutMapping("/api/v1/lab-reports/{reportId}/manual-confirmation")
@@ -337,7 +351,7 @@ public class CoreController {
 			@PathVariable String reportId,
 			@Valid @RequestBody AppContracts.LabReportManualConfirmRequest request
 	) {
-		return ApiResponse.success(healthAssistantService.confirmLabReportManually(userId, reportId, request));
+		return ApiResponse.success(labReportService.confirmLabReportManually(userId, reportId, request));
 	}
 
 	@PostMapping("/api/v1/knowledge/ask")

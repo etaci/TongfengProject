@@ -1555,6 +1555,91 @@ class BackendApiFlowTests {
 	}
 
 	@Test
+	void shouldListOwnedFilesAfterUpload() throws Exception {
+		MvcResult userOneLogin = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "file-owner"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+		String userOneToken = objectMapper.readTree(userOneLogin.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		MvcResult userTwoLogin = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "other-owner"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+		String userTwoToken = objectMapper.readTree(userTwoLogin.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		MockMultipartFile ownerFile = new MockMultipartFile(
+				"file",
+				"owner-note.txt",
+				MediaType.TEXT_PLAIN_VALUE,
+				"owner file".getBytes()
+		);
+		mockMvc.perform(multipart("/api/v1/files/upload")
+						.file(ownerFile)
+						.header("Authorization", "Bearer " + userOneToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.fileName").value("owner-note.txt"));
+
+		MockMultipartFile otherFile = new MockMultipartFile(
+				"file",
+				"other-note.txt",
+				MediaType.TEXT_PLAIN_VALUE,
+				"other file".getBytes()
+		);
+		mockMvc.perform(multipart("/api/v1/files/upload")
+						.file(otherFile)
+						.header("Authorization", "Bearer " + userTwoToken))
+				.andExpect(status().isOk());
+
+		MvcResult listResult = mockMvc.perform(get("/api/v1/files?limit=20")
+						.header("Authorization", "Bearer " + userOneToken))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		JsonNode files = objectMapper.readTree(listResult.getResponse().getContentAsString()).path("data");
+		assertEquals(1, files.size());
+		assertEquals("owner-note.txt", files.get(0).path("fileName").asText());
+	}
+
+	@Test
+	void shouldReturn404ForUnknownApiPath() throws Exception {
+		MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "404-user"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+		String token = objectMapper.readTree(loginResult.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		mockMvc.perform(get("/api/v1/not-exists")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+	}
+
+	@Test
 	void shouldExposeOpenApiAndTraceIdForErrors() throws Exception {
 		mockMvc.perform(get("/api/openapi"))
 				.andExpect(status().isOk())

@@ -1,48 +1,142 @@
 @host = http://localhost:8080
-@token = 请先把登录返回里的 token 填到这里
+@token = 请先填入正式登录返回的 token
+@familyToken = 请填入家属账号 token
+@inviteCode = 请填入家属邀请码
+@bindingCode = 请填入家属绑定码
+@patientUserId = 请填入患者 userId
+@reportId = 请填入化验单 reportId
+@recordId = 请填入记录 recordId
+@auditId = 请填入审计 auditId
+@sessionCode = 请填入会话 sessionCode
+@taskCode = 请填入家属代办 taskCode
 
-### 1. 模拟登录
-POST {{host}}/api/v1/auth/mock-login
+### 1. 正式注册
+POST {{host}}/api/v1/auth/register
 Content-Type: application/json
 
 {
-  "nickname": "联调用户"
+  "accountKey": "demo@example.com",
+  "password": "Passw0rd!",
+  "displayName": "联调用例",
+  "acceptPrivacyPolicy": true
 }
 
-### 2. 查看档案
+### 2. 正式登录
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "accountKey": "demo@example.com",
+  "password": "Passw0rd!"
+}
+
+### 3. 当前会话
+GET {{host}}/api/v1/auth/session
+Authorization: Bearer {{token}}
+
+### 4. 能力开关
+GET {{host}}/api/v1/app/capabilities
+Authorization: Bearer {{token}}
+
+### 5. 查询档案
 GET {{host}}/api/v1/profile
 Authorization: Bearer {{token}}
 
-### 3. 更新档案
+### 6. 更新档案
 PUT {{host}}/api/v1/profile
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "联调用户",
+  "name": "联调用例",
   "gender": "MALE",
   "birthday": "1992-05-20",
   "heightCm": 175,
   "targetUricAcid": 360,
-  "allergies": ["别嘌醇过敏"],
+  "allergies": ["海鲜过敏"],
   "comorbidities": ["高尿酸血症"],
   "emergencyContact": "家属A"
 }
 
-### 4. 尿酸录入
+### 7. 上传原始文件
+POST {{host}}/api/v1/files/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="lab-report.pdf"
+Content-Type: application/pdf
+
+< ./fixtures/lab-report.pdf
+--WebAppBoundary--
+
+### 7.1 查询最近上传文件
+GET {{host}}/api/v1/files?limit=20
+Authorization: Bearer {{token}}
+
+### 8. 餐盘识别
+POST {{host}}/api/v1/meals/analyze
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="meal.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/meal.jpg
+--WebAppBoundary
+Content-Disposition: form-data; name="mealType"
+
+DINNER
+--WebAppBoundary
+Content-Disposition: form-data; name="takenAt"
+
+2026-06-20T12:00:00Z
+--WebAppBoundary
+Content-Disposition: form-data; name="note"
+
+晚餐
+--WebAppBoundary--
+
+### 9. 新增尿酸记录
 POST {{host}}/api/v1/records/uric-acid
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "value": 468,
-  "unit": "μmol/L",
-  "measuredAt": "2026-04-26T09:00:00Z",
-  "source": "家用尿酸仪",
+  "unit": "umol/L",
+  "measuredAt": "2026-06-20T08:00:00Z",
+  "source": "HOME_TEST",
   "note": "晨起空腹"
 }
 
-### 5. 饮水打卡
+### 10. 新增体重记录
+POST {{host}}/api/v1/records/weight
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "value": 72.5,
+  "unit": "kg",
+  "measuredAt": "2026-06-20T08:05:00Z",
+  "note": "晨起"
+}
+
+### 11. 新增发作记录
+POST {{host}}/api/v1/records/flares
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "joint": "LEFT_ANKLE",
+  "painLevel": 6,
+  "startedAt": "2026-06-19T22:30:00Z",
+  "durationNote": "约 3 小时",
+  "note": "夜间发作"
+}
+
+### 12. 新增饮水记录
 POST {{host}}/api/v1/records/hydration
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -50,60 +144,123 @@ Content-Type: application/json
 {
   "waterIntakeMl": 1200,
   "urineColorLevel": 4,
-  "checkedAt": "2026-04-26T10:30:00Z",
+  "checkedAt": "2026-06-20T10:30:00Z",
   "note": "上午补水偏少"
 }
 
-### 6. 血压录入
-POST {{host}}/api/v1/records/blood-pressure
+### 13. 记录中心
+GET {{host}}/api/v1/records/center?limit=20
+Authorization: Bearer {{token}}
+
+### 14. 记录详情
+GET {{host}}/api/v1/records/detail?type=URIC_ACID&recordId={{recordId}}
+Authorization: Bearer {{token}}
+
+### 15. 编辑记录
+PUT {{host}}/api/v1/records/detail?type=URIC_ACID&recordId={{recordId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "systolicPressure": 148,
-  "diastolicPressure": 96,
-  "pulseRate": 82,
-  "unit": "mmHg",
-  "measuredAt": "2026-04-29T11:00:00Z",
-  "source": "home-bp-device",
-  "note": "evening measure"
+  "value": 455,
+  "unit": "umol/L",
+  "measuredAt": "2026-06-20T08:00:00Z",
+  "source": "HOME_TEST",
+  "note": "修正后数值",
+  "changeReason": "原始录入数值有误"
 }
 
-### 7. 查看血压记录
-GET {{host}}/api/v1/records/blood-pressure
+### 16. 查询审计
+GET {{host}}/api/v1/records/audits?type=URIC_ACID&recordId={{recordId}}&limit=20
 Authorization: Bearer {{token}}
 
-### 8. 首页总览
+### 17. 恢复记录
+POST {{host}}/api/v1/records/restore?type=URIC_ACID&recordId={{recordId}}&auditId={{auditId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "changeReason": "回滚到上一版本"
+}
+
+### 18. 删除记录
+DELETE {{host}}/api/v1/records/detail?type=URIC_ACID&recordId={{recordId}}
+Authorization: Bearer {{token}}
+
+### 19. 首页总览
 GET {{host}}/api/v1/dashboard/overview
 Authorization: Bearer {{token}}
 
-### 9. 趋势数据
+### 20. 今日行动
+GET {{host}}/api/v1/home/today
+Authorization: Bearer {{token}}
+
+### 21. 趋势
 GET {{host}}/api/v1/dashboard/trends?days=7
 Authorization: Bearer {{token}}
 
-### 10. 每日汇总
+### 22. 每日摘要
 GET {{host}}/api/v1/dashboard/daily-summaries?days=7
 Authorization: Bearer {{token}}
 
-### 11. 提醒列表
+### 23. 提醒列表
 GET {{host}}/api/v1/reminders
 Authorization: Bearer {{token}}
 
-### 12. 痛风知识问答
+### 24. 尿酸原因分析
+GET {{host}}/api/v1/analysis/uric-acid-causes?lookbackDays=7
+Authorization: Bearer {{token}}
+
+### 25. 化验单上传并解析
+POST {{host}}/api/v1/lab-reports/analyze?reportDate=2026-06-20
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="lab-report.pdf"
+Content-Type: application/pdf
+
+< ./fixtures/lab-report.pdf
+--WebAppBoundary--
+
+### 26. 化验单列表
+GET {{host}}/api/v1/lab-reports
+Authorization: Bearer {{token}}
+
+### 27. 化验单复盘 / 待确认详情
+GET {{host}}/api/v1/lab-reports/{{reportId}}/review
+Authorization: Bearer {{token}}
+
+### 28. 人工确认化验单
+PUT {{host}}/api/v1/lab-reports/{{reportId}}/manual-confirmation
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "indicators": [
+    {
+      "code": "UA",
+      "name": "尿酸",
+      "value": 468,
+      "unit": "umol/L",
+      "referenceRange": "208-428",
+      "riskLevel": "YELLOW"
+    }
+  ],
+  "summaryNote": "已对照原始报告人工确认"
+}
+
+### 29. 知识问答
 POST {{host}}/api/v1/knowledge/ask
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "question": "尿酸偏高时聚餐能不能喝啤酒？",
+  "question": "尿酸偏高时能不能喝啤酒？",
   "scene": "周末聚餐前"
 }
 
-### 13. 查看用户画像
-GET {{host}}/api/v1/persona/summary
-Authorization: Bearer {{token}}
-
-### 14. 更新用药计划
+### 30. 用药计划
 PUT {{host}}/api/v1/medications
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -114,171 +271,127 @@ Content-Type: application/json
       "name": "别嘌醇",
       "dosage": "100mg",
       "frequency": "每日一次",
-      "remark": "晚饭后"
+      "remark": "晚饭后",
+      "remainingDays": 10,
+      "refillThresholdDays": 3
     }
   ],
   "followUpNote": "两周后复查尿酸"
 }
 
-### 15. 查看用药计划
+### 31. 查询用药计划
 GET {{host}}/api/v1/medications
 Authorization: Bearer {{token}}
 
-### 16. 查看时间线
-GET {{host}}/api/v1/records/timeline
-Authorization: Bearer {{token}}
-
-### 17. 更新主动管理设置
-PUT {{host}}/api/v1/proactive-care/settings
+### 32. 服药打卡
+POST {{host}}/api/v1/medications/check-ins
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "monitoringCity": "Shanghai",
-  "countryCode": "CN",
-  "weatherAlertsEnabled": true
+  "medicationName": "别嘌醇",
+  "scheduledPeriod": "EVENING",
+  "status": "TAKEN_ON_TIME",
+  "note": "饭后已服用"
 }
 
-### 18. 查看主动风险简报
-GET {{host}}/api/v1/proactive-care/brief
+### 33. 用药依从性
+GET {{host}}/api/v1/medications/adherence?days=7
 Authorization: Bearer {{token}}
 
-### 19. 查看最近一次发作复盘
-GET {{host}}/api/v1/flares/reports/latest?lookbackDays=7
+### 34. 用药周报
+GET {{host}}/api/v1/medications/weekly-report?days=7
 Authorization: Bearer {{token}}
 
-### 20. 发起家属邀请
+### 35. 创建家属邀请
 POST {{host}}/api/v1/family/invitations
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "relationType": "SPOUSE",
-  "inviteMessage": "一起关注近期风险",
-  "expiresInDays": 7
+  "inviteMessage": "一起关注最近风险",
+  "expiresInDays": 7,
+  "caregiverPermission": "SUMMARY_ONLY",
+  "weeklyReportEnabled": true,
+  "notifyOnHighRisk": true
 }
 
-### 21. 查看我发起的家属邀请
+### 36. 查询家属邀请
 GET {{host}}/api/v1/family/invitations
 Authorization: Bearer {{token}}
 
-### 22. 接受家属邀请
+### 37. 接受家属邀请
 POST {{host}}/api/v1/family/invitations/{{inviteCode}}/accept
 Authorization: Bearer {{familyToken}}
 
-### 23. 查看家属绑定列表
+### 38. 查询家属绑定
 GET {{host}}/api/v1/family/members
-Authorization: Bearer {{familyToken}}
+Authorization: Bearer {{token}}
 
-### 24. 查看家属告警列表
+### 39. 更新家属权限
+PUT {{host}}/api/v1/family/members/{{bindingCode}}/permissions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "caregiverPermission": "SUMMARY_AND_ALERTS",
+  "weeklyReportEnabled": true,
+  "notifyOnHighRisk": true
+}
+
+### 40. 家属提醒列表
 GET {{host}}/api/v1/family/alerts
 Authorization: Bearer {{familyToken}}
 
-### 25. 查看患者风险摘要
+### 41. 家属代办列表
+GET {{host}}/api/v1/family/tasks
+Authorization: Bearer {{familyToken}}
+
+### 42. 创建家属代办
+POST {{host}}/api/v1/family/members/{{bindingCode}}/tasks
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "title": "提醒按时复查",
+  "description": "本周内完成尿酸复查",
+  "dueAt": "2026-06-23T12:00:00Z"
+}
+
+### 43. 完成家属代办
+POST {{host}}/api/v1/family/tasks/{{taskCode}}/complete
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "completionNote": "已提醒患者处理"
+}
+
+### 44. 家属查看患者摘要
 GET {{host}}/api/v1/family/patients/{{patientUserId}}/summary
 Authorization: Bearer {{familyToken}}
 
-### 26. 解除家属绑定
-DELETE {{host}}/api/v1/family/members/{{bindingCode}}
+### 45. 家属查看患者用药周报
+GET {{host}}/api/v1/family/patients/{{patientUserId}}/weekly-report?days=7
+Authorization: Bearer {{familyToken}}
+
+### 46. 查询访问策略
+GET {{host}}/api/v1/access/policy
 Authorization: Bearer {{token}}
 
-### 27. 绑定设备
-POST {{host}}/api/v1/devices
+### 47. 查询自己的访问审计
+GET {{host}}/api/v1/access/audits?limit=20
 Authorization: Bearer {{token}}
+
+### 48. 查询患者访问审计
+GET {{host}}/api/v1/access/patient-audits?limit=20
+Authorization: Bearer {{token}}
+
+### 49. 开发专用 mock-login
+POST {{host}}/api/v1/auth/mock-login
 Content-Type: application/json
 
 {
-  "deviceType": "URIC_ACID_METER",
-  "vendorName": "Tongfeng",
-  "deviceModel": "UA-1",
-  "serialNumber": "UA-SN-001",
-  "aliasName": "家用尿酸仪"
+  "nickname": "仅开发调试使用"
 }
-
-### 28. 查看设备列表
-GET {{host}}/api/v1/devices
-Authorization: Bearer {{token}}
-
-### 29. 设备同步数据
-POST {{host}}/api/v1/devices/{{deviceCode}}/sync
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "items": [
-    {
-      "metricType": "URIC_ACID",
-      "externalEventId": "evt-ua-1",
-      "measuredAt": "2026-04-29T08:00:00Z",
-      "value": 502,
-      "unit": "μmol/L",
-      "note": "device sync"
-    },
-    {
-      "metricType": "HYDRATION",
-      "externalEventId": "evt-hyd-1",
-      "measuredAt": "2026-04-29T09:00:00Z",
-      "waterIntakeMl": 900,
-      "urineColorLevel": 4,
-      "note": "smart cup sync"
-    },
-    {
-      "metricType": "WEIGHT",
-      "externalEventId": "evt-weight-1",
-      "measuredAt": "2026-04-29T10:00:00Z",
-      "value": 71.8,
-      "unit": "kg",
-      "note": "smart scale sync"
-    },
-    {
-      "metricType": "BLOOD_PRESSURE",
-      "externalEventId": "evt-bp-1",
-      "measuredAt": "2026-04-29T10:05:00Z",
-      "systolicPressure": 162,
-      "diastolicPressure": 101,
-      "pulseRate": 88,
-      "unit": "mmHg",
-      "note": "bp monitor sync"
-    }
-  ]
-}
-
-### 30. 查看设备同步历史
-GET {{host}}/api/v1/devices/{{deviceCode}}/sync-events
-Authorization: Bearer {{token}}
-
-### 31. 解绑设备
-DELETE {{host}}/api/v1/devices/{{deviceCode}}
-Authorization: Bearer {{token}}
-
-### 32. 查看成长总览
-GET {{host}}/api/v1/growth/overview
-Authorization: Bearer {{token}}
-
-### 33. 查看今日成长任务
-GET {{host}}/api/v1/growth/tasks
-Authorization: Bearer {{token}}
-
-### 34. 查看积分流水
-GET {{host}}/api/v1/growth/points?limit=20
-Authorization: Bearer {{token}}
-
-### 35. 查看成长徽章
-GET {{host}}/api/v1/growth/badges
-Authorization: Bearer {{token}}
-
-### 36. 查看成长周计划
-GET {{host}}/api/v1/growth/weekly-plan
-Authorization: Bearer {{token}}
-
-### 37. 查看奖励中心
-GET {{host}}/api/v1/growth/rewards
-Authorization: Bearer {{token}}
-
-### 38. 兑换奖励
-POST {{host}}/api/v1/growth/rewards/DIET_GUIDE_PACK/claim
-Authorization: Bearer {{token}}
-
-### 39. 查看奖励领取历史
-GET {{host}}/api/v1/growth/reward-claims
-Authorization: Bearer {{token}}

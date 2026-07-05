@@ -784,7 +784,7 @@ public final class AppContracts {
 			@NotBlank(message = "指标名称不能为空")
 			String name,
 			@NotNull(message = "指标数值不能为空")
-			@Positive(message = "指标数值必须大于0")
+			@Positive(message = "指标数值必须大于 0")
 			BigDecimal value,
 			@NotBlank(message = "指标单位不能为空")
 			String unit,
