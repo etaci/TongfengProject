@@ -8,6 +8,11 @@ import org.springframework.http.HttpStatus;
 public enum AppErrorCode {
 
 	OK("OK", HttpStatus.OK, "SYSTEM", false, "success"),
+	RESOURCE_NOT_FOUND("RESOURCE_NOT_FOUND", HttpStatus.NOT_FOUND, "HTTP", false, "请求的接口或资源不存在"),
+	METHOD_NOT_ALLOWED("METHOD_NOT_ALLOWED", HttpStatus.METHOD_NOT_ALLOWED, "HTTP", false, "请求方法不受支持"),
+	UNSUPPORTED_MEDIA_TYPE("UNSUPPORTED_MEDIA_TYPE", HttpStatus.UNSUPPORTED_MEDIA_TYPE, "HTTP", false, "请求媒体类型不受支持"),
+	INVALID_REQUEST_BODY("INVALID_REQUEST_BODY", HttpStatus.BAD_REQUEST, "VALIDATION", false, "请求体无法解析"),
+	FILE_TOO_LARGE("FILE_TOO_LARGE", HttpStatus.PAYLOAD_TOO_LARGE, "FILE", false, "上传文件超过大小限制"),
 
 	UNAUTHORIZED("UNAUTHORIZED", HttpStatus.UNAUTHORIZED, "AUTH", false, "未授权访问"),
 	FORBIDDEN("FORBIDDEN", HttpStatus.FORBIDDEN, "AUTH", false, "无权访问"),

@@ -6,6 +6,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class LocalFileStorageService {
+
+	private static final Logger log = LoggerFactory.getLogger(LocalFileStorageService.class);
+	private static final int MAX_STORED_FILE_NAME_LENGTH = 180;
 
 	private final AppProperties appProperties;
 
@@ -26,7 +31,7 @@ public class LocalFileStorageService {
 			throw new BusinessException("EMPTY_FILE", "上传文件不能为空");
 		}
 		String originalName = StringUtils.hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "upload.bin";
-		String safeName = originalName.replace("\\", "_").replace("/", "_");
+		String safeName = sanitizeFileName(originalName);
 		LocalDate today = LocalDate.now(ZoneOffset.UTC);
 		Path relativePath = Paths.get("uploads", today.toString(), fileCode + "_" + safeName);
 		Path rootPath = Paths.get(appProperties.getStorageRoot()).toAbsolutePath().normalize();
@@ -56,6 +61,37 @@ public class LocalFileStorageService {
 			throw new BusinessException("FILE_NOT_FOUND", "文件已丢失");
 		}
 		return resource;
+	}
+
+	public void deleteQuietly(String relativePath) {
+		if (!StringUtils.hasText(relativePath)) {
+			return;
+		}
+		Path rootPath = Paths.get(appProperties.getStorageRoot()).toAbsolutePath().normalize();
+		Path targetPath = rootPath.resolve(relativePath).normalize();
+		if (!targetPath.startsWith(rootPath)) {
+			log.warn("Skip deleting file outside storage root: {}", relativePath);
+			return;
+		}
+		try {
+			Files.deleteIfExists(targetPath);
+		} catch (IOException ex) {
+			log.warn("Failed to delete orphaned upload: {}", relativePath, ex);
+		}
+	}
+
+	private String sanitizeFileName(String originalName) {
+		String safeName = originalName
+				.replace("\\", "_")
+				.replace("/", "_")
+				.replaceAll("[\\p{Cntrl}]", "_")
+				.trim();
+		if (!StringUtils.hasText(safeName)) {
+			safeName = "upload.bin";
+		}
+		return safeName.length() <= MAX_STORED_FILE_NAME_LENGTH
+				? safeName
+				: safeName.substring(0, MAX_STORED_FILE_NAME_LENGTH);
 	}
 
 	public record StoredPhysicalFile(

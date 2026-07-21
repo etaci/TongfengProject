@@ -284,7 +284,9 @@ public final class AppContracts {
 	}
 
 	public record AppCapabilitiesResponse(
-			List<FeatureStatusResponse> features
+			List<FeatureStatusResponse> features,
+			String capabilityVersion,
+			Instant generatedAt
 	) {
 	}
 

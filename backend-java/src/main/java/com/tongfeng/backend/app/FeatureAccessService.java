@@ -1,12 +1,16 @@
 package com.tongfeng.backend.app;
 
+import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
 public class FeatureAccessService {
 
+	private static final String CAPABILITY_VERSION = "2026-07-21";
+
 	private final AppProperties appProperties;
+	private final Instant generatedAt = Instant.now();
 
 	public FeatureAccessService(AppProperties appProperties) {
 		this.appProperties = appProperties;
@@ -44,7 +48,7 @@ public class FeatureAccessService {
 						false,
 						"legacy / disabled / internal only：当前版本不对前端开放，不承诺联调。"
 				)
-		));
+		), CAPABILITY_VERSION, generatedAt);
 	}
 
 	public void ensureFamilyEnabled() {

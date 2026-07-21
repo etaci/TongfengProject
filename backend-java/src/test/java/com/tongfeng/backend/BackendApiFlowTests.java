@@ -1584,17 +1584,34 @@ class BackendApiFlowTests {
 				.path("token")
 				.asText();
 
-		MockMultipartFile ownerFile = new MockMultipartFile(
+		MockMultipartFile olderOwnerFile = new MockMultipartFile(
 				"file",
-				"owner-note.txt",
+				"owner-older.txt",
 				MediaType.TEXT_PLAIN_VALUE,
-				"owner file".getBytes()
+				"older owner file".getBytes()
 		);
-		mockMvc.perform(multipart("/api/v1/files/upload")
-						.file(ownerFile)
+		MvcResult olderUploadResult = mockMvc.perform(multipart("/api/v1/files/upload")
+						.file(olderOwnerFile)
 						.header("Authorization", "Bearer " + userOneToken))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.fileName").value("owner-note.txt"));
+				.andExpect(jsonPath("$.data.fileName").value("owner-older.txt"))
+				.andReturn();
+		String ownerFileId = objectMapper.readTree(olderUploadResult.getResponse().getContentAsString())
+				.path("data")
+				.path("fileId")
+				.asText();
+
+		Thread.sleep(5);
+		MockMultipartFile newerOwnerFile = new MockMultipartFile(
+				"file",
+				"owner-newer.txt",
+				MediaType.TEXT_PLAIN_VALUE,
+				"newer owner file".getBytes()
+		);
+		mockMvc.perform(multipart("/api/v1/files/upload")
+						.file(newerOwnerFile)
+						.header("Authorization", "Bearer " + userOneToken))
+				.andExpect(status().isOk());
 
 		MockMultipartFile otherFile = new MockMultipartFile(
 				"file",
@@ -1613,8 +1630,32 @@ class BackendApiFlowTests {
 				.andReturn();
 
 		JsonNode files = objectMapper.readTree(listResult.getResponse().getContentAsString()).path("data");
-		assertEquals(1, files.size());
-		assertEquals("owner-note.txt", files.get(0).path("fileName").asText());
+		assertEquals(2, files.size());
+		assertEquals("owner-newer.txt", files.get(0).path("fileName").asText());
+		assertEquals("owner-older.txt", files.get(1).path("fileName").asText());
+
+		mockMvc.perform(get("/api/v1/files/{fileId}", ownerFileId)
+						.header("Authorization", "Bearer " + userTwoToken))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+		MvcResult emptyUserLogin = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "empty-file-owner"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+		String emptyUserToken = objectMapper.readTree(emptyUserLogin.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+		mockMvc.perform(get("/api/v1/files")
+						.header("Authorization", "Bearer " + emptyUserToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").isEmpty());
 	}
 
 	@Test
@@ -1637,6 +1678,98 @@ class BackendApiFlowTests {
 						.header("Authorization", "Bearer " + token))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+	}
+
+	@Test
+	void shouldKeepMockIdentityAndCapabilitiesStable() throws Exception {
+		MvcResult firstLogin = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": " Stable-Mock-User "
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+		MvcResult secondLogin = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "stable-mock-user"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+		MvcResult differentLogin = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "different-mock-user"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		JsonNode firstData = objectMapper.readTree(firstLogin.getResponse().getContentAsString()).path("data");
+		JsonNode secondData = objectMapper.readTree(secondLogin.getResponse().getContentAsString()).path("data");
+		JsonNode differentData = objectMapper.readTree(differentLogin.getResponse().getContentAsString()).path("data");
+		assertEquals(firstData.path("userId").asText(), secondData.path("userId").asText());
+		assertTrue(!firstData.path("userId").asText().equals(differentData.path("userId").asText()));
+
+		String token = secondData.path("token").asText();
+		MvcResult firstCapabilities = mockMvc.perform(get("/api/v1/app/capabilities")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.features").isNotEmpty())
+				.andExpect(jsonPath("$.data.capabilityVersion").value("2026-07-21"))
+				.andExpect(jsonPath("$.data.generatedAt").isNotEmpty())
+				.andReturn();
+		MvcResult secondCapabilities = mockMvc.perform(get("/api/v1/app/capabilities")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andReturn();
+		assertEquals(
+				objectMapper.readTree(firstCapabilities.getResponse().getContentAsString()).path("data").path("generatedAt").asText(),
+				objectMapper.readTree(secondCapabilities.getResponse().getContentAsString()).path("data").path("generatedAt").asText()
+		);
+	}
+
+	@Test
+	void shouldMapExpectedClientErrorsWithoutReturning500() throws Exception {
+		MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/mock-login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "nickname": "http-error-user"
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+		String token = objectMapper.readTree(loginResult.getResponse().getContentAsString())
+				.path("data")
+				.path("token")
+				.asText();
+
+		mockMvc.perform(post("/api/v1/profile")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isMethodNotAllowed())
+				.andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"))
+				.andExpect(jsonPath("$.traceId").isNotEmpty())
+				.andExpect(jsonPath("$.path").value("/api/v1/profile"));
+
+		mockMvc.perform(post("/api/v1/records/uric-acid")
+						.header("Authorization", "Bearer " + token)
+						.contentType(MediaType.TEXT_PLAIN)
+						.content("not-json"))
+				.andExpect(status().isUnsupportedMediaType())
+				.andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+
+		mockMvc.perform(post("/api/v1/records/uric-acid")
+						.header("Authorization", "Bearer " + token)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
 	}
 
 	@Test

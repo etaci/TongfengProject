@@ -197,31 +197,41 @@ public class HealthAssistantService {
 
 	@Transactional
 	public AppContracts.AuthTokenResponse mockLogin(AppContracts.MockLoginRequest request, AuthRequestContext requestContext) {
-		String userId = idGenerator.next("user");
+		String nickname = request.nickname().trim();
+		String normalizedNickname = nickname.toLowerCase(Locale.ROOT);
+		String userId = "user-mock-" + UUID.nameUUIDFromBytes(
+				("tongfeng-mock:" + normalizedNickname).getBytes(StandardCharsets.UTF_8)
+		).toString().replace("-", "");
 		Instant now = Instant.now();
-		UserAccountEntity accountEntity = new UserAccountEntity();
-		accountEntity.setUserCode(userId);
-		accountEntity.setNickname(request.nickname());
-		accountEntity.setCreatedAt(now);
+		UserAccountEntity accountEntity = userAccountRepository.findByUserCode(userId)
+				.orElseGet(() -> {
+					UserAccountEntity entity = new UserAccountEntity();
+					entity.setUserCode(userId);
+					entity.setCreatedAt(now);
+					return entity;
+				});
+		accountEntity.setNickname(nickname);
 		accountEntity.setUpdatedAt(now);
 		userAccountRepository.save(accountEntity);
 
-		UserProfileEntity profileEntity = new UserProfileEntity();
-		profileEntity.setUserCode(userId);
-		profileEntity.setName(request.nickname());
-		profileEntity.setGender("UNKNOWN");
-		profileEntity.setTargetUricAcid(360);
-		profileEntity.setAllergiesJson(jsonCodec.toJson(List.of()));
-		profileEntity.setComorbiditiesJson(jsonCodec.toJson(List.of()));
-		profileEntity.setUpdatedAt(now);
-		userProfileRepository.save(profileEntity);
+		if (userProfileRepository.findByUserCode(userId).isEmpty()) {
+			UserProfileEntity profileEntity = new UserProfileEntity();
+			profileEntity.setUserCode(userId);
+			profileEntity.setName(nickname);
+			profileEntity.setGender("UNKNOWN");
+			profileEntity.setTargetUricAcid(360);
+			profileEntity.setAllergiesJson(jsonCodec.toJson(List.of()));
+			profileEntity.setComorbiditiesJson(jsonCodec.toJson(List.of()));
+			profileEntity.setUpdatedAt(now);
+			userProfileRepository.save(profileEntity);
+		}
 
 		AppContracts.AuthTokenResponse tokenResponse = createAuthSessionResponse(
 				userId,
-				request.nickname(),
+				nickname,
 				"MOCK",
 				"DEMO",
-				request.nickname(),
+				normalizedNickname,
 				buildLoginSecurityAssessment(userId, "MOCK", requestContext),
 				false,
 				false
@@ -2998,15 +3008,20 @@ public class HealthAssistantService {
 	private StoredFileEntity persistStoredFile(String userId, MultipartFile file) {
 		String fileCode = idGenerator.next("file");
 		LocalFileStorageService.StoredPhysicalFile storedPhysicalFile = localFileStorageService.save(fileCode, file);
-		StoredFileEntity entity = new StoredFileEntity();
-		entity.setFileCode(fileCode);
-		entity.setUserCode(userId);
-		entity.setFileName(storedPhysicalFile.fileName());
-		entity.setContentType(storedPhysicalFile.contentType());
-		entity.setFileSize(storedPhysicalFile.size());
-		entity.setRelativePath(storedPhysicalFile.relativePath());
-		entity.setUploadedAt(Instant.now());
-		return storedFileRepository.save(entity);
+		try {
+			StoredFileEntity entity = new StoredFileEntity();
+			entity.setFileCode(fileCode);
+			entity.setUserCode(userId);
+			entity.setFileName(storedPhysicalFile.fileName());
+			entity.setContentType(storedPhysicalFile.contentType());
+			entity.setFileSize(storedPhysicalFile.size());
+			entity.setRelativePath(storedPhysicalFile.relativePath());
+			entity.setUploadedAt(Instant.now());
+			return storedFileRepository.saveAndFlush(entity);
+		} catch (RuntimeException ex) {
+			localFileStorageService.deleteQuietly(storedPhysicalFile.relativePath());
+			throw ex;
+		}
 	}
 
 	private AppContracts.UserProfileResponse toProfileResponse(UserProfileEntity profile) {

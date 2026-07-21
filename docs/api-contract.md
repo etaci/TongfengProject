@@ -98,6 +98,14 @@ Authorization: Bearer {token}
 - `displayName`
 - `enabled`
 - `note`
+- `capabilityVersion`
+- `generatedAt`
+
+说明：
+
+- `capabilityVersion` 用于前端识别能力契约版本
+- `generatedAt` 在同一 Java 服务实例生命周期内保持稳定
+- 能力关闭必须通过 `enabled=false` 表达，不能通过字段缺失表达
 
 当前对外约定：
 
@@ -801,3 +809,20 @@ Authorization: Bearer {token}
 7. lab-reports
 8. medications
 9. family
+
+## 18. HTTP 错误映射
+
+前端应同时读取 HTTP 状态码和响应体 `code`：
+
+| 场景 | HTTP | code |
+|---|---:|---|
+| 路由或资源不存在 | 404 | `RESOURCE_NOT_FOUND` |
+| 文件不存在 | 404 | `FILE_NOT_FOUND` |
+| 请求方法不支持 | 405 | `METHOD_NOT_ALLOWED` |
+| 媒体类型不支持 | 415 | `UNSUPPORTED_MEDIA_TYPE` |
+| JSON 请求体无法解析 | 400 | `INVALID_REQUEST_BODY` |
+| 上传文件超过限制 | 413 | `FILE_TOO_LARGE` |
+| 文件不属于当前用户 | 403 | `FORBIDDEN` |
+| 未知服务端异常 | 500 | `INTERNAL_ERROR` |
+
+所有错误响应继续保留 `traceId` 和 `path`，便于联调排查。
