@@ -32,15 +32,18 @@ public class CoreController {
 	private final HealthAssistantService healthAssistantService;
 	private final LabReportService labReportService;
 	private final FeatureAccessService featureAccessService;
+	private final PatientJourneyService patientJourneyService;
 
 	public CoreController(
 			HealthAssistantService healthAssistantService,
 			LabReportService labReportService,
-			FeatureAccessService featureAccessService
+			FeatureAccessService featureAccessService,
+			PatientJourneyService patientJourneyService
 	) {
 		this.healthAssistantService = healthAssistantService;
 		this.labReportService = labReportService;
 		this.featureAccessService = featureAccessService;
+		this.patientJourneyService = patientJourneyService;
 	}
 
 	@GetMapping("/api/v1/app/capabilities")
@@ -246,7 +249,7 @@ public class CoreController {
 	public ApiResponse<AppContracts.TimelineResponse> getTimeline(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
-		return ApiResponse.success(healthAssistantService.getTimeline(userId));
+		return ApiResponse.success(patientJourneyService.getTimeline(userId));
 	}
 
 	@GetMapping("/api/v1/dashboard/overview")
@@ -260,7 +263,7 @@ public class CoreController {
 	public ApiResponse<AppContracts.TodayActionPlanResponse> getTodayActionPlan(
 			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
 	) {
-		return ApiResponse.success(healthAssistantService.getTodayActionPlan(userId));
+		return ApiResponse.success(patientJourneyService.getTodayActionPlan(userId));
 	}
 
 	@GetMapping("/api/v1/mvp/metrics/summary")

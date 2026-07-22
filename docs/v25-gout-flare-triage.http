@@ -1,0 +1,20 @@
+@baseUrl = http://127.0.0.1:8080
+@token = replace-with-session-token
+
+### 结构化痛风发作分诊
+POST {{baseUrl}}/api/v1/triage/gout-flare
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "onsetAt": "2026-07-21T08:00:00Z",
+  "jointLocation": "left-big-toe",
+  "painLevel": 7,
+  "rednessOrSwelling": true,
+  "fever": false,
+  "canBearWeight": true,
+  "recentMedicationChange": false,
+  "traumaHistory": false,
+  "firstEpisode": false,
+  "systemicSymptoms": false
+}

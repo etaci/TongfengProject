@@ -950,6 +950,10 @@ public class HealthAssistantService {
 				userId,
 				overallRisk,
 				triageCode,
+				null,
+				null,
+				null,
+				List.of(),
 				triageTitle,
 				triageSummary,
 				nextStep,
@@ -2910,6 +2914,7 @@ public class HealthAssistantService {
 		entity.setFamilyCollaborationAuthorized(defaultBoolean(request.familyCollaborationAuthorized(), true));
 		entity.setNotificationAuthorized(defaultBoolean(request.notificationAuthorized(), true));
 		entity.setSourceType(sourceType);
+		entity.setChangeReason(null);
 		entity.setEffectiveAt(now);
 		entity.setCreatedAt(now);
 		return privacyConsentRecordRepository.save(entity);
@@ -2927,6 +2932,7 @@ public class HealthAssistantService {
 				entity.isFamilyCollaborationAuthorized(),
 				entity.isNotificationAuthorized(),
 				entity.getSourceType(),
+				entity.getChangeReason(),
 				entity.getEffectiveAt(),
 				entity.getCreatedAt()
 		);

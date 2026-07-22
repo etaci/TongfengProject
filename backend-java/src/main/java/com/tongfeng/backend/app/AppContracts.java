@@ -6,7 +6,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -238,8 +240,48 @@ public final class AppContracts {
 			boolean familyCollaborationAuthorized,
 			boolean notificationAuthorized,
 			String sourceType,
+			String changeReason,
 			Instant effectiveAt,
 			Instant createdAt
+	) {
+	}
+
+	public record PrivacyAuthorizationWithdrawalRequest(
+			@NotEmpty(message = "请至少选择一项要撤回的授权")
+			List<@NotBlank String> scopes,
+			@NotBlank(message = "请填写授权撤回原因")
+			@Size(max = 200, message = "授权撤回原因不能超过 200 个字符")
+			String reason
+	) {
+	}
+
+	public record AccountDeletionRequest(
+			@NotBlank(message = "请输入删除确认文本")
+			String confirmation,
+			@Size(max = 200, message = "注销原因不能超过 200 个字符")
+			String reason
+	) {
+	}
+
+	public record AccountDeletionResponse(
+			String deletionReceipt,
+			String status,
+			int deletedDatabaseRows,
+			int scheduledPhysicalFiles,
+			Instant completedAt,
+			String message
+	) {
+	}
+
+	public record PrivacyNoticeResponse(
+			String version,
+			Instant effectiveAt,
+			List<String> collectedData,
+			List<String> purposes,
+			List<String> userRights,
+			List<String> thirdPartyProcessors,
+			String retentionPolicy,
+			String medicalBoundary
 	) {
 	}
 
@@ -577,6 +619,10 @@ public final class AppContracts {
 			String userId,
 			RiskLevel overallRiskLevel,
 			String triageCode,
+			String triageDecisionCode,
+			String triageRuleVersion,
+			String triageVerificationStatus,
+			List<String> triageRedFlags,
 			String triageTitle,
 			String triageSummary,
 			String nextStep,
@@ -584,6 +630,104 @@ public final class AppContracts {
 			List<TodayActionItemResponse> actions,
 			List<String> trustNotes,
 			Instant generatedAt
+	) {
+	}
+
+	public record GoutFlareTriageRequest(
+			@NotNull(message = "起病时间不能为空")
+			@PastOrPresent(message = "起病时间不能晚于当前时间")
+			Instant onsetAt,
+			@NotBlank(message = "关节位置不能为空")
+			@Size(max = 128, message = "关节位置不能超过 128 个字符")
+			String jointLocation,
+			@Min(value = 0, message = "疼痛等级不能小于 0")
+			@Max(value = 10, message = "疼痛等级不能大于 10")
+			int painLevel,
+			@NotNull(message = "请确认是否红肿")
+			Boolean rednessOrSwelling,
+			@NotNull(message = "请确认是否发热")
+			Boolean fever,
+			@NotNull(message = "请确认是否可以负重")
+			Boolean canBearWeight,
+			@NotNull(message = "请确认近期是否调整用药")
+			Boolean recentMedicationChange,
+			@NotNull(message = "请确认是否有外伤史")
+			Boolean traumaHistory,
+			@NotNull(message = "请确认是否首次发作")
+			Boolean firstEpisode,
+			@NotNull(message = "请确认是否有全身不适症状")
+			Boolean systemicSymptoms
+	) {
+	}
+
+	public record ClinicalSourceReference(
+			String sourceCode,
+			String title,
+			String url
+	) {
+	}
+
+	public record GoutFlareTriageResponse(
+			String decisionCode,
+			String triageCode,
+			RiskLevel triageLevel,
+			String summary,
+			List<String> reasons,
+			List<String> redFlags,
+			List<String> nextActions,
+			String ruleVersion,
+			List<ClinicalSourceReference> sourceReferences,
+			String verificationStatus,
+			Instant generatedAt,
+			String disclaimer
+	) {
+	}
+
+	public record DoctorVisitLabSummary(
+			String reportId,
+			LocalDate reportDate,
+			RiskLevel riskLevel,
+			String verificationStatus,
+			boolean readyForClinicalReview,
+			String sourceType
+	) {
+	}
+
+	public record DoctorVisitPackageResponse(
+			String packageCode,
+			int lookbackDays,
+			String patientName,
+			Integer targetUricAcid,
+			List<TrendPoint> uricAcidTrend,
+			List<FlareRecordResponse> flareRecords,
+			MedicationWeeklyReportResponse medicationAdherence,
+			List<DoctorVisitLabSummary> labReports,
+			GoutFlareTriageResponse latestTriage,
+			List<String> questionsForDoctor,
+			List<String> dataSources,
+			List<String> trustNotes,
+			Instant generatedAt
+	) {
+	}
+
+	public record DoctorVisitShareCreateRequest(
+			@Min(value = 30, message = "就诊包统计周期至少为 30 天")
+			@Max(value = 90, message = "就诊包统计周期最多为 90 天")
+			Integer lookbackDays,
+			@Min(value = 1, message = "分享有效期至少为 1 小时")
+			@Max(value = 168, message = "分享有效期最多为 168 小时")
+			Integer expiresInHours
+	) {
+	}
+
+	public record DoctorVisitShareResponse(
+			String shareCode,
+			String shareToken,
+			String sharePath,
+			int lookbackDays,
+			Instant expiresAt,
+			boolean revoked,
+			Instant createdAt
 	) {
 	}
 
@@ -658,8 +802,24 @@ public final class AppContracts {
 			String title,
 			String detail,
 			Instant occurredAt,
-			RiskLevel riskLevel
+			RiskLevel riskLevel,
+			String triageCode,
+			String ruleVersion,
+			String decisionCode,
+			String verificationStatus,
+			List<String> redFlags,
+			List<String> nextActions
 	) {
+		public TimelineEvent(
+				String eventId,
+				String type,
+				String title,
+				String detail,
+				Instant occurredAt,
+				RiskLevel riskLevel
+		) {
+			this(eventId, type, title, detail, occurredAt, riskLevel, null, null, null, null, List.of(), List.of());
+		}
 	}
 
 	public record TimelineResponse(List<TimelineEvent> events) {

@@ -1,3 +1,8 @@
 com\tongfeng\backend\BackendJavaApplicationTests.class
+com\tongfeng\backend\FlywaySchemaValidationTests.class
+com\tongfeng\backend\GoutTriageApiTests.class
 com\tongfeng\backend\MockLoginDisabledTests.class
+com\tongfeng\backend\PrivacyDataRightsApiTests.class
 com\tongfeng\backend\BackendApiFlowTests.class
+com\tongfeng\backend\GoutTriageApiTests$LoginSession.class
+com\tongfeng\backend\DoctorVisitPackageApiTests.class

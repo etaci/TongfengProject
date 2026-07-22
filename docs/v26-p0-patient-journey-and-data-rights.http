@@ -1,0 +1,61 @@
+@baseUrl = http://127.0.0.1:8080
+@token = replace-with-session-token
+@shareCode = replace-with-share-code
+@shareToken = replace-with-share-token
+
+### 今日行动，包含最近 V25 可信字段
+GET {{baseUrl}}/api/v1/home/today
+Authorization: Bearer {{token}}
+
+### 时间线，包含 GOUT_TRIAGE 事件
+GET {{baseUrl}}/api/v1/records/timeline
+Authorization: Bearer {{token}}
+
+### 30 天医生就诊包
+GET {{baseUrl}}/api/v1/doctor-visit-packages?days=30
+Authorization: Bearer {{token}}
+
+### 下载 PDF
+GET {{baseUrl}}/api/v1/doctor-visit-packages/pdf?days=30
+Authorization: Bearer {{token}}
+
+### 创建 24 小时分享
+POST {{baseUrl}}/api/v1/doctor-visit-shares
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "lookbackDays": 30,
+  "expiresInHours": 24
+}
+
+### 公开读取分享
+GET {{baseUrl}}/api/public/doctor-visit-shares/{{shareToken}}
+
+### 撤销分享
+DELETE {{baseUrl}}/api/v1/doctor-visit-shares/{{shareCode}}
+Authorization: Bearer {{token}}
+
+### 导出我的数据
+GET {{baseUrl}}/api/v1/privacy/data-export
+Authorization: Bearer {{token}}
+
+### 撤回可选授权
+POST {{baseUrl}}/api/v1/privacy/consents/withdraw
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "scopes": ["MEDICAL_DATA", "FAMILY_COLLABORATION"],
+  "reason": "停止相关数据处理"
+}
+
+### 永久删除账号
+DELETE {{baseUrl}}/api/v1/privacy/account
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "confirmation": "DELETE_MY_ACCOUNT",
+  "reason": "不再使用"
+}

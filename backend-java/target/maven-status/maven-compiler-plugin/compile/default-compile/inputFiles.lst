@@ -10,9 +10,14 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AuthInter
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\AuthRequestContext.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\BusinessException.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\CoreController.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\DoctorVisitPackageController.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\DoctorVisitPackageService.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\DoctorVisitPdfRenderer.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\FamilyCareService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\FeatureAccessService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\GlobalExceptionHandler.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\GoutTriageController.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\GoutTriageService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\HealthAssistantService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\HealthAutomationScheduler.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\HealthRuleEngineService.java
@@ -23,11 +28,14 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\LocalFile
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\MvpMetricsService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\OpenApiConfig.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\PasswordHashService.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\PatientJourneyService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AccessAuditEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthIdentityEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthSessionEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\AuthVerificationChallengeEntity.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\ClinicalDecisionAuditEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\DailyHealthSummaryEntity.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\DoctorVisitShareEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\FamilyBindingEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\FamilyInviteEntity.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\entity\FamilyTaskEntity.java
@@ -52,7 +60,9 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persisten
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AuthIdentityRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AuthSessionRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\AuthVerificationChallengeRepository.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\ClinicalDecisionAuditRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\DailyHealthSummaryRepository.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\DoctorVisitShareRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\FamilyBindingRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\FamilyInviteRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\FamilyTaskRepository.java
@@ -73,6 +83,7 @@ H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persisten
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\UserProfileRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\WeatherDailySnapshotRepository.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\persistence\repo\WeightRecordRepository.java
+H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\PrivacyDataService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\ProactiveCareService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\RecordCenterService.java
 H:\ProjectTongfeng\backend-java\src\main\java\com\tongfeng\backend\app\RequestTraceContext.java

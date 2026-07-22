@@ -809,6 +809,7 @@ Authorization: Bearer {token}
 7. lab-reports
 8. medications
 9. family
+10. triage/gout-flare
 
 ## 18. HTTP 错误映射
 
@@ -826,3 +827,79 @@ Authorization: Bearer {token}
 | 未知服务端异常 | 500 | `INTERNAL_ERROR` |
 
 所有错误响应继续保留 `traceId` 和 `path`，便于联调排查。
+
+## 19. 痛风发作结构化分诊
+
+### 19.1 `POST /api/v1/triage/gout-flare`
+
+用途：
+
+- 收集起病时间、关节位置、红肿、发热、负重能力、近期用药变化、外伤史等结构化症状。
+- 输出 `SELF_MANAGEMENT`、`CONTACT_DOCTOR_SOON`、`URGENT_OFFLINE` 三级就医分流建议。
+
+前置条件：
+
+- 已登录。
+- 所有布尔问卷字段必须明确提交，不得用字段缺失表达“否”。
+
+是否进入正式结论链路：
+
+- 否。结果用于健康管理和就医分流，不构成诊断，不自动进入化验单正式复盘、医生摘要或处方链路。
+
+失败后的回退策略：
+
+- `VALIDATION_ERROR`：保留问卷内容，定位字段后允许用户修正。
+- `UNAUTHORIZED`：回到登录状态。
+- 其他错误：展示统一错误信息和 `traceId`，不得伪造或缓存为已完成分流。
+
+请求字段：
+
+- `onsetAt`：ISO-8601 时间，不能晚于当前时间。
+- `jointLocation`
+- `painLevel`：0-10。
+- `rednessOrSwelling`
+- `fever`
+- `canBearWeight`
+- `recentMedicationChange`
+- `traumaHistory`
+- `firstEpisode`
+- `systemicSymptoms`
+
+返回字段：
+
+- `decisionCode`
+- `triageCode`
+- `triageLevel`
+- `summary`
+- `reasons`
+- `redFlags`
+- `nextActions`
+- `ruleVersion`
+- `sourceReferences`
+- `verificationStatus`
+- `generatedAt`
+- `disclaimer`
+
+前端必须展示 `reasons`、`nextActions`、`verificationStatus` 和 `disclaimer`，不能只展示颜色或单一结果文案。完整状态和审计边界见 [v25-gout-flare-triage.md](./v25-gout-flare-triage.md)。
+
+## 20. V25 患者旅程与 P0 数据权利接口
+
+V25 分诊提交后会进入今日行动、时间线、患者提醒和已授权家属告警。今日行动新增 `triageDecisionCode`、`triageRuleVersion`、`triageVerificationStatus`、`triageRedFlags`；时间线 V25 事件新增 `triageCode`、`ruleVersion`、`decisionCode`、`verificationStatus`、`redFlags`、`nextActions`。
+
+医生就诊包接口：
+
+- `GET /api/v1/doctor-visit-packages?days=30|90`
+- `GET /api/v1/doctor-visit-packages/print?days=30|90`
+- `GET /api/v1/doctor-visit-packages/pdf?days=30|90`
+- `POST /api/v1/doctor-visit-shares`
+- `DELETE /api/v1/doctor-visit-shares/{shareCode}`
+- `GET /api/public/doctor-visit-shares/{shareToken}`
+
+数据权利接口：
+
+- `GET /api/v1/privacy/data-export`
+- `POST /api/v1/privacy/consents/withdraw`
+- `DELETE /api/v1/privacy/account`
+- `GET /api/public/privacy-notice`
+
+用途、前置条件、状态字典、失败回退和联调示例见 [v26-p0-patient-journey-and-data-rights.md](./v26-p0-patient-journey-and-data-rights.md)。

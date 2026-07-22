@@ -44,10 +44,10 @@ public class WeatherDailySnapshotEntity {
 	@Column(length = 64)
 	private String timezoneId;
 
-	@Column(precision = 6, scale = 2)
+	@Column(name = "temperature_c", precision = 6, scale = 2)
 	private BigDecimal temperatureC;
 
-	@Column(precision = 6, scale = 2)
+	@Column(name = "apparent_temperature_c", precision = 6, scale = 2)
 	private BigDecimal apparentTemperatureC;
 
 	private Integer relativeHumidity;

@@ -25,6 +25,8 @@ public class WebConfig implements WebMvcConfigurer {
 						"/api/v1/auth/verification-codes/request",
 						"/api/v1/auth/password-reset/confirm",
 						"/api/public/error-codes",
+						"/api/public/privacy-notice",
+						"/api/public/doctor-visit-shares/**",
 						"/api/openapi/**",
 						"/v3/api-docs/**",
 						"/swagger-ui/**",

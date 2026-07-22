@@ -1,6 +1,8 @@
 package db.migration;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Locale;
@@ -20,7 +22,9 @@ public class V3__fix_text_columns extends BaseJavaMigration {
 		alterColumn(connection, "meal_record", "items_json", textType, false);
 		alterColumn(connection, "meal_record", "suggestions_json", textType, false);
 		alterColumn(connection, "medication_plan", "current_medications_json", textType, false);
-		alterColumn(connection, "mvp_usage_event", "payload_json", textType, false);
+		if (tableExists(connection, "mvp_usage_event")) {
+			alterColumn(connection, "mvp_usage_event", "payload_json", textType, false);
+		}
 		alterColumn(connection, "user_profile", "allergies_json", textType, true);
 		alterColumn(connection, "user_profile", "comorbidities_json", textType, true);
 	}
@@ -42,5 +46,18 @@ public class V3__fix_text_columns extends BaseJavaMigration {
 		try (Statement statement = connection.createStatement()) {
 			statement.execute(sql);
 		}
+	}
+
+	private boolean tableExists(Connection connection, String tableName) throws SQLException {
+		DatabaseMetaData metadata = connection.getMetaData();
+		String[] candidates = {tableName, tableName.toUpperCase(Locale.ROOT), tableName.toLowerCase(Locale.ROOT)};
+		for (String candidate : candidates) {
+			try (ResultSet tables = metadata.getTables(connection.getCatalog(), null, candidate, new String[] {"TABLE"})) {
+				if (tables.next()) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 }

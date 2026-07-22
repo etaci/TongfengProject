@@ -50,6 +50,9 @@ public class PrivacyConsentRecordEntity {
 	@Column(nullable = false, length = 32)
 	private String sourceType;
 
+	@Column(length = 200)
+	private String changeReason;
+
 	@Column(nullable = false)
 	private Instant effectiveAt;
 
@@ -138,6 +141,14 @@ public class PrivacyConsentRecordEntity {
 
 	public void setSourceType(String sourceType) {
 		this.sourceType = sourceType;
+	}
+
+	public String getChangeReason() {
+		return changeReason;
+	}
+
+	public void setChangeReason(String changeReason) {
+		this.changeReason = changeReason;
 	}
 
 	public Instant getEffectiveAt() {

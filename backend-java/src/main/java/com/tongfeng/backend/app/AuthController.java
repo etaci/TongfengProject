@@ -5,7 +5,11 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.List;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,10 +25,16 @@ public class AuthController {
 
 	private final HealthAssistantService healthAssistantService;
 	private final AppProperties appProperties;
+	private final PrivacyDataService privacyDataService;
 
-	public AuthController(HealthAssistantService healthAssistantService, AppProperties appProperties) {
+	public AuthController(
+			HealthAssistantService healthAssistantService,
+			AppProperties appProperties,
+			PrivacyDataService privacyDataService
+	) {
 		this.healthAssistantService = healthAssistantService;
 		this.appProperties = appProperties;
+		this.privacyDataService = privacyDataService;
 	}
 
 	@PostMapping("/api/v1/auth/mock-login")
@@ -166,6 +176,52 @@ public class AuthController {
 			@Valid @RequestBody AppContracts.PrivacyConsentSubmitRequest request
 	) {
 		return ApiResponse.success(healthAssistantService.updatePrivacyConsent(userId, request));
+	}
+
+	@PostMapping("/api/v1/privacy/consents/withdraw")
+	@Operation(summary = "撤回可选授权", description = "撤回医疗数据、家庭协同或通知授权，并保留历史授权记录。")
+	public ApiResponse<AppContracts.PrivacyConsentResponse> withdrawPrivacyAuthorizations(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@Valid @RequestBody AppContracts.PrivacyAuthorizationWithdrawalRequest request
+	) {
+		return ApiResponse.success(privacyDataService.withdrawAuthorizations(userId, request));
+	}
+
+	@GetMapping("/api/v1/privacy/data-export")
+	@Operation(summary = "导出我的数据", description = "下载当前账号的健康记录、授权历史、临床决策和家庭协同数据，不包含密码摘要或会话令牌。")
+	public ResponseEntity<byte[]> exportOwnedData(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId
+	) {
+		byte[] content = privacyDataService.exportOwnedData(userId);
+		return ResponseEntity.ok()
+				.contentType(MediaType.parseMediaType("application/zip"))
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=health-data-export.zip")
+				.body(content);
+	}
+
+	@DeleteMapping("/api/v1/privacy/account")
+	@Operation(summary = "永久注销并删除账号", description = "不可逆删除账号、健康数据、授权记录、家属关系和上传文件，并使全部会话失效。")
+	public ApiResponse<AppContracts.AccountDeletionResponse> deleteAccount(
+			@RequestAttribute(AuthInterceptor.CURRENT_USER_ID) String userId,
+			@Valid @RequestBody AppContracts.AccountDeletionRequest request
+	) {
+		return ApiResponse.success(privacyDataService.deleteAccount(userId, request));
+	}
+
+	@GetMapping("/api/public/privacy-notice")
+	@Operation(summary = "获取隐私说明", description = "供注册页和隐私中心渲染当前隐私范围、用户权利及医疗边界。")
+	@SecurityRequirements
+	public ApiResponse<AppContracts.PrivacyNoticeResponse> getPrivacyNotice() {
+		return ApiResponse.success(new AppContracts.PrivacyNoticeResponse(
+				"privacy-v1.1",
+				Instant.parse("2026-07-22T00:00:00Z"),
+				List.of("账号资料", "健康记录", "化验单与上传文件", "用药与发作记录", "临床决策审计", "家属授权与访问审计"),
+				List.of("提供痛风和高尿酸管理", "生成可解释提醒与复盘", "保障账号与数据安全"),
+				List.of("访问和导出数据", "更正记录", "撤回可选授权", "永久注销并删除账号"),
+				List.of("AI/OCR 服务：仅在启用时处理必要内容", "天气服务：仅处理城市或坐标", "邮件/短信服务：仅在用户请求验证时处理联系方式"),
+				"健康数据在账号存续期间保存；用户完成永久删除后清理业务数据和上传文件，依法必须保留的最小安全记录应去标识化。",
+				"系统提供健康管理和就医分流，不构成诊断或处方；红旗症状应及时线下就医。"
+		));
 	}
 
 	private AuthRequestContext buildRequestContext(HttpServletRequest request) {
